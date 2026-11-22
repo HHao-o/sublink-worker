@@ -152,8 +152,13 @@ export const formLogicFn = (t) => {
                     }
                 }
 
-                // Initialize rules
-                this.applyPredefinedRule();
+                const draft = window.languageSwitchDraft?.ruleSelection;
+                if (draft) {
+                    this.selectedPredefinedRule = draft.selectedPredefinedRule;
+                    this.selectedRules = draft.selectedRules;
+                } else {
+                    this.applyPredefinedRule();
+                }
 
                 // Watchers to save state
                 this.$watch('input', val => {
@@ -177,6 +182,13 @@ export const formLogicFn = (t) => {
                 });
                 this.$watch('customShortCode', val => localStorage.setItem('customShortCode', val));
                 this.$watch('accordionSections', val => localStorage.setItem('accordionSections', JSON.stringify(val)), { deep: true });
+            },
+
+            saveLanguageSwitchDraft(draft) {
+                draft.ruleSelection = {
+                    selectedPredefinedRule: this.selectedPredefinedRule,
+                    selectedRules: this.selectedRules
+                };
             },
 
             toggleAccordion(section) {

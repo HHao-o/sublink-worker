@@ -46,11 +46,11 @@ export const Form = (props) => {
   `;
 
   return (
-    <div x-data="formData()" x-init="init()" class="max-w-4xl mx-auto">
-      <form {...{'x-on:submit.prevent': 'submitForm'}} class="space-y-8">
+    <div x-data="formData()" {...{'x-on:language-switch.window': 'saveLanguageSwitchDraft($event.detail)'}} class="max-w-7xl mx-auto">
+      <form {...{'x-on:submit.prevent': 'submitForm'}} class="grid items-start gap-6 lg:grid-cols-2 lg:gap-8">
 
       {/* Input Section */}
-      <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 transition-all duration-300 hover:shadow-md group">
+      <div class="min-w-0 lg:sticky lg:top-24 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 transition-shadow duration-300 hover:shadow-md group">
         <TextareaWithActions
           id="input"
           name="input"
@@ -95,37 +95,42 @@ export const Form = (props) => {
         />
       </div>
 
-      {/* Advanced Options Toggle */}
-      <div 
-        class="flex items-center justify-between bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors" 
-        x-on:click="showAdvanced = !showAdvanced"
-        role="button"
-        tabindex="0"
-        {...{
-          'x-on:keydown.enter.prevent': 'showAdvanced = !showAdvanced',
-          'x-on:keydown.space.prevent': 'showAdvanced = !showAdvanced'
-        }}
-      >
-        <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-full bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 flex items-center justify-center">
-            <i class="fas fa-sliders-h"></i>
-          </div>
-          <span class="font-semibold text-gray-900 dark:text-white">{t('advancedOptions')}</span>
-        </div>
-        <div 
-          class="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 transition-transform duration-300" 
-          x-bind:class="{'rotate-180': showAdvanced}"
+      <div class="min-w-0 flex flex-col gap-4">
+        <button
+          type="button"
+          id="advanced-options-toggle"
+          aria-controls="advanced-options"
+          x-bind:aria-expanded="showAdvanced"
+          x-on:click="showAdvanced = !showAdvanced"
+          class="w-full flex items-center justify-between gap-3 text-left bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
         >
-          <i class="fas fa-chevron-down"></i>
-        </div>
-      </div>
+          <span class="flex items-center gap-3">
+            <span class="w-10 h-10 shrink-0 rounded-full bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 flex items-center justify-center">
+              <i class="fas fa-sliders-h" aria-hidden="true"></i>
+            </span>
+            <span class="font-semibold text-gray-900 dark:text-white">{t('advancedOptions')}</span>
+          </span>
+          <span
+            class="w-8 h-8 shrink-0 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 transition-transform duration-300"
+            x-bind:class="{'rotate-180': showAdvanced}"
+          >
+            <i class="fas fa-chevron-down" aria-hidden="true"></i>
+          </span>
+        </button>
 
-  {/* Advanced Options Content */ }
-  <div x-show="showAdvanced" {...{'x-transition:enter': 'transition ease-out duration-300', 'x-transition:enter-start': 'opacity-0 transform -translate-y-4', 'x-transition:enter-end': 'opacity-100 transform translate-y-0', 'x-transition:leave': 'transition ease-in duration-200', 'x-transition:leave-start': 'opacity-100 transform translate-y-0', 'x-transition:leave-end': 'opacity-0 transform -translate-y-4'}} class="space-y-6">
+  <div
+    id="advanced-options"
+    role="region"
+    aria-labelledby="advanced-options-toggle"
+    tabindex="0"
+    x-cloak
+    x-show="showAdvanced"
+    class="space-y-6 lg:max-h-[max(12rem,calc(100dvh_-_18rem))] lg:overflow-y-auto lg:overscroll-y-contain lg:[scrollbar-gutter:stable] lg:p-1"
+  >
 
     {/* Rule Selection */ }
     <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-      <div class="flex items-center justify-between mb-4">
+      <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
         <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
           <i class="fas fa-filter text-gray-400"></i>
           {t('ruleSelection')}
@@ -138,7 +143,7 @@ export const Form = (props) => {
       </select>
           </div>
 
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
     {UNIFIED_RULES.map((rule) => (
       <label class="flex items-center p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer transition-colors group">
         <input
@@ -241,7 +246,7 @@ export const Form = (props) => {
 
   {/* Base Config */ }
   <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-            <div class="flex items-center justify-between mb-4">
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
               <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                 <i class="fas fa-file-code text-gray-400"></i>
                 {t('baseConfigSettings')}
@@ -339,6 +344,7 @@ class="px-6 py-3.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 bo
 { t('clear') }
           </button>
         </div>
+      </div>
       </form>
 
   {/* Results Section */ }

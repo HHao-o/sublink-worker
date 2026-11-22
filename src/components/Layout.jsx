@@ -2,10 +2,10 @@ import { html } from 'hono/html'
 import { APP_KEYWORDS } from '../constants.js';
 
 export const Layout = (props) => {
-  const { title, children } = props
+  const { lang, title, children } = props
   return html`
     <!DOCTYPE html>
-    <html lang="en" x-data="appData()">
+    <html lang="${lang}" x-data="appData()">
       <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -113,8 +113,38 @@ export const Layout = (props) => {
           [x-cloak] { display: none !important; }
         </style>
         <script>
+          const languageSwitchDraftKey = 'sublink_language_switch_draft';
+
+          try {
+            const saved = JSON.parse(sessionStorage.getItem(languageSwitchDraftKey));
+            sessionStorage.removeItem(languageSwitchDraftKey);
+            if (saved?.target === location.pathname + location.search) {
+              window.languageSwitchDraft = saved.draft;
+            }
+          } catch {
+            // Language links still work when browser storage is unavailable.
+          }
+
           function appData() {
             return {
+              switchLanguage(event) {
+                if (event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+
+                const target = new URL(location.href);
+                target.searchParams.set('lang', event.currentTarget.hreflang);
+                const draft = {};
+                window.dispatchEvent(new CustomEvent('language-switch', { detail: draft }));
+                try {
+                  sessionStorage.setItem(languageSwitchDraftKey, JSON.stringify({
+                    target: target.pathname + target.search,
+                    draft
+                  }));
+                } catch {
+                  // Storage restrictions should not block the language change.
+                }
+                event.preventDefault();
+                location.assign(target.href);
+              },
               darkMode: localStorage.getItem('theme') === 'dark' || (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches),
               toggleDarkMode() {
                 this.darkMode = !this.darkMode;
@@ -209,7 +239,7 @@ export const Layout = (props) => {
 
           // i18n helper for update checker
           function getUpdateI18n(key) {
-            const lang = navigator.language || 'en-US';
+            const lang = document.documentElement.lang;
             const translations = {
               'zh-CN': {
                 newVersionAvailable: '发现新版本',

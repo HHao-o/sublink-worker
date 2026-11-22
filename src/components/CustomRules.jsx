@@ -7,7 +7,7 @@ export const CustomRules = (props) => {
     const { t } = props;
 
     return (
-        <div x-data="customRulesData()" class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+        <div x-data="customRulesData()" {...{'x-on:language-switch.window': 'saveCustomRulesDraft($event.detail)'}} class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
             <div class="flex items-center justify-between mb-4">
                 <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                     <i class="fas fa-stream text-gray-400"></i>
@@ -255,7 +255,18 @@ export const CustomRules = (props) => {
             jsonError: null,
             jsonValid: false,
             
+            saveCustomRulesDraft(draft) {
+              draft.customRules = { mode: this.mode, rules: this.rules, jsonContent: this.jsonContent };
+            },
+
             init() {
+              const draft = window.languageSwitchDraft?.customRules;
+              if (draft) {
+                this.mode = draft.mode;
+                this.rules = draft.rules;
+                this.jsonContent = draft.jsonContent;
+              }
+
               // Watch for changes in rules to update JSON content
               this.$watch('rules', (value) => {
                 if (this.mode === 'form') {
