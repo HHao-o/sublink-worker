@@ -46,6 +46,16 @@
 - **Docker**: `docker pull ghcr.io/7sageer/sublink-worker:latest`
 - **Docker Compose**: `docker compose up -d` (includes Redis)
 
+### Cloudflare Pages
+
+In your [Git-connected Pages project](https://developers.cloudflare.com/pages/get-started/git-integration/), select the **None** framework preset, leave the root directory at the repository root, leave the **Build command** blank, and set the **Build output directory** to `public`.
+
+Pages automatically compiles the `functions` directory. The catch-all route runs the app directly on the Pages domain; no separate Worker or `npm run deploy` step is required. The root `wrangler.toml` is for standalone Workers and may be skipped by Pages.
+
+To enable short links and saved base configurations, [bind your existing KV namespace](https://developers.cloudflare.com/pages/functions/bindings/#kv-namespaces) as `SUBLINK_KV` in the Pages project settings, then redeploy. Reuse the same namespace to keep existing short codes and configuration IDs.
+
+For local development, run `npx wrangler pages dev public --kv SUBLINK_KV`.
+
 ## ✨ Features
 
 ### Supported Protocols
