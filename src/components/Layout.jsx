@@ -110,6 +110,18 @@ export const Layout = (props) => {
             opacity: 0.15;
           }
 
+          html,
+          #input,
+          #advanced-options {
+            scrollbar-width: none;
+          }
+
+          html::-webkit-scrollbar,
+          #input::-webkit-scrollbar,
+          #advanced-options::-webkit-scrollbar {
+            display: none;
+          }
+
           [x-cloak] { display: none !important; }
         </style>
         <script>

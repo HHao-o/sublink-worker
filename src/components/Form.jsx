@@ -125,7 +125,7 @@ export const Form = (props) => {
     tabindex="0"
     x-cloak
     x-show="showAdvanced"
-    class="space-y-6 lg:max-h-[max(12rem,calc(100dvh_-_18rem))] lg:overflow-y-auto lg:overscroll-y-contain lg:[scrollbar-gutter:stable] lg:p-1"
+    class="space-y-6 lg:max-h-[max(12rem,calc(100dvh_-_18rem))] lg:overflow-y-auto lg:overscroll-y-contain lg:p-1"
   >
 
     {/* Rule Selection */ }
