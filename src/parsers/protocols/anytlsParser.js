@@ -49,7 +49,8 @@ export function parseAnytls(url) {
     };
     const serverName = getFirstParam(params, ['sni', 'servername', 'host']);
     if (serverName) {
-        tls.server_name = serverName;
+        // Rich-text copies can append a duplicate link that is not part of the SNI.
+        tls.server_name = serverName.replace(/^([a-z0-9.-]+)\s+\(https?:\/\/\1\/?\)$/i, '$1');
     }
 
     // These extensions are emitted by established AnyTLS clients even though

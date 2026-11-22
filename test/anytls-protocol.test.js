@@ -79,6 +79,31 @@ describe('AnyTLS protocol support', () => {
         expect(result.tag).toBe('ANYTLS main');
     });
 
+    it.each([
+        'tls.example.com (http://tls.example.com/)',
+        'tls.example.com%20(https://TLS.EXAMPLE.COM/)'
+    ])('keeps only the hostname for a repeated SNI annotation: %s', async (sni) => {
+        const uri = `anytls://test-password@192.0.2.1:14443/?sni=${sni}#Test`;
+        const builder = new ClashConfigBuilder(uri, 'minimal', [], null, 'zh-CN');
+        const config = yaml.load(await builder.build());
+
+        expect(config.proxies).toEqual([expect.objectContaining({
+            name: 'Test',
+            type: 'anytls',
+            server: '192.0.2.1',
+            port: 14443,
+            sni: 'tls.example.com',
+            'skip-cert-verify': false
+        })]);
+    });
+
+    it('does not guess the SNI when the parenthesized URL has a different hostname', () => {
+        const sni = 'tls.example.com (http://other.example.com/)';
+        const uri = `anytls://test-password@192.0.2.1:14443/?sni=${encodeURIComponent(sni)}#Test`;
+
+        expect(parseAnytls(uri).tls.server_name).toBe(sni);
+    });
+
     it('keeps AnyTLS nodes from remote URI subscriptions in Clash output', async () => {
         mockFetchText('anytls://letmein@example.com/?sni=real.example.com');
         const builder = new ClashConfigBuilder(
