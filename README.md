@@ -48,9 +48,9 @@
 
 ### Cloudflare Pages
 
-In your [Git-connected Pages project](https://developers.cloudflare.com/pages/get-started/git-integration/), select the **None** framework preset, leave the root directory at the repository root, leave the **Build command** blank, and set the **Build output directory** to `public`.
+In your [Git-connected Pages project](https://developers.cloudflare.com/pages/get-started/git-integration/), select the **None** framework preset, leave the root directory at the repository root, set the **Build command** to `npm ci --omit=dev`, and set the **Build output directory** to `public`.
 
-Pages automatically compiles the `functions` directory. The catch-all route runs the app directly on the Pages domain; no separate Worker or `npm run deploy` step is required. The root `wrangler.toml` is for standalone Workers and may be skipped by Pages.
+The build command installs the dependencies required by Pages Functions. A blank command can skip installation, leaving imports such as `hono` and `js-yaml` unresolved. Pages then compiles the `functions` directory and runs the app directly on the Pages domain. Do not use `npm run deploy`, which deploys a separate Worker. The root `wrangler.toml` is for standalone Workers and may be skipped by Pages.
 
 To enable short links and saved base configurations, [bind your existing KV namespace](https://developers.cloudflare.com/pages/functions/bindings/#kv-namespaces) as `SUBLINK_KV` in the Pages project settings, then redeploy. Reuse the same namespace to keep existing short codes and configuration IDs.
 
@@ -59,7 +59,7 @@ For local development, run `npx wrangler pages dev public --kv SUBLINK_KV`.
 ## ✨ Features
 
 ### Supported Protocols
-ShadowSocks • VMess • VLESS • Hysteria2 • Trojan • TUIC
+ShadowSocks • VMess • VLESS • Hysteria2 • Trojan • TUIC • AnyTLS • SOCKS5
 
 ### Client Support
 Sing-Box • Clash • Xray/V2Ray • Surge
