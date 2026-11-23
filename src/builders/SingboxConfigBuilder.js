@@ -108,6 +108,8 @@ export class SingboxConfigBuilder extends BaseConfigBuilder {
         // AnyTLS arrived in sing-box 1.12; 1.11 rejects the unknown outbound
         // type and with it the whole config.
         if (proxy.type === 'anytls' && this.singboxVersion === '1.11') return null;
+        // Native sing-box SOCKS outbounds cannot enable TLS directly.
+        if (proxy.type === 'socks' && proxy.tls?.enabled) return null;
 
         // Create a shallow copy to avoid mutating the original
         const sanitized = { ...proxy };
@@ -136,6 +138,7 @@ export class SingboxConfigBuilder extends BaseConfigBuilder {
         // every group that selects this node — including DNS hijack and fakeip.
         delete sanitized.udp;
         delete sanitized.network;
+        if (proxy.type === 'socks' && proxy.udp === false) sanitized.network = 'tcp';
 
         if (sanitized.plugin) {
             const plugin = toSingboxPlugin(sanitized.plugin, sanitized.plugin_opts);

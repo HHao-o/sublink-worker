@@ -1,7 +1,7 @@
 import { decodeBase64 } from '../../utils.js';
 import { parseSubscriptionContent } from './subscriptionContentParser.js';
 
-const SUBSCRIPTION_URI_PATTERN = /^(ss|vmess|vless|hysteria|hysteria2|hy2|trojan|tuic|anytls|http|https):\/\//i;
+const SUBSCRIPTION_URI_PATTERN = /^(ss|vmess|vless|hysteria|hysteria2|hy2|trojan|tuic|anytls|socks|socks5|socks4|socks5\+tls|http|https):\/\//i;
 
 function hasSubscriptionUriLine(content) {
     return content
@@ -28,6 +28,13 @@ function decodeUriComponentIfNeeded(text) {
     const trimmed = text.trim();
     if (!trimmed.includes('%')) {
         return trimmed;
+    }
+    // SOCKS userinfo must be split before decoding escaped credential delimiters.
+    // Keep the existing decoding behavior for other lines in mixed subscriptions.
+    const socksLine = /^\s*(socks|socks5|socks4|socks5\+tls):\/\//i;
+    const lines = trimmed.split('\n');
+    if (lines.some(line => socksLine.test(line))) {
+        return lines.map(line => socksLine.test(line) ? line : decodeUriComponentIfNeeded(line)).join('\n');
     }
 
     try {

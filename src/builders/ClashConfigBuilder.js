@@ -313,6 +313,13 @@ export class ClashConfigBuilder extends BaseConfigBuilder {
                 };
             }
             case 'socks':
+                // Mihomo has no SOCKS4 outbound; never silently reinterpret it as SOCKS5.
+                if (proxy.version === '4' || proxy.version === '4a') return null;
+                // SOCKS TLS in Mihomo always sends the server hostname as SNI.
+                if (proxy.tls?.enabled && proxy.tls.server_name && proxy.tls.server_name.toLowerCase() !== proxy.server.toLowerCase()) {
+                    console.warn('Skipping SOCKS TLS node: independent SNI is not supported by Mihomo');
+                    return null;
+                }
                 return {
                     name: proxy.tag,
                     type: 'socks5',
@@ -321,6 +328,10 @@ export class ClashConfigBuilder extends BaseConfigBuilder {
                     ...(proxy.username ? { username: proxy.username } : {}),
                     ...(proxy.password ? { password: proxy.password } : {}),
                     udp: getClashUdpValue(proxy),
+                    ...(proxy.tls?.enabled ? {
+                        tls: true,
+                        ...(proxy.tls.insecure !== undefined ? { 'skip-cert-verify': proxy.tls.insecure } : {})
+                    } : {})
                 };
             default:
                 return proxy; // Return as-is if no specific conversion is defined

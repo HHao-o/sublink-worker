@@ -5,7 +5,7 @@ import { parseHysteria2 } from './protocols/hysteria2Parser.js';
 import { parseTrojan } from './protocols/trojanParser.js';
 import { parseTuic } from './protocols/tuicParser.js';
 import { parseAnytls } from './protocols/anytlsParser.js';
-import { parseSocks } from './protocols/socksParser.js';
+import { isBareSocks, parseSocks } from './protocols/socksParser.js';
 import { fetchSubscription } from './subscription/httpSubscriptionFetcher.js';
 
 const protocolParsers = {
@@ -21,7 +21,9 @@ const protocolParsers = {
     tuic: parseTuic,
     anytls: parseAnytls,
     socks: parseSocks,
-    socks5: parseSocks
+    socks5: parseSocks,
+    socks4: parseSocks,
+    'socks5+tls': parseSocks
 };
 
 export class ProxyParser {
@@ -30,7 +32,7 @@ export class ProxyParser {
             return undefined;
         }
         const trimmed = url.trim();
-        const type = trimmed.split('://')[0].toLowerCase();
+        const type = isBareSocks(trimmed) ? 'socks' : trimmed.split('://')[0].toLowerCase();
         const parser = protocolParsers[type];
         if (!parser) {
             return undefined;
