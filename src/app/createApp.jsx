@@ -28,9 +28,10 @@ export function createApp(bindings = {}) {
 
     const app = new Hono();
 
+    // The site is Chinese-first: Accept-Language no longer picks the default,
+    // so an English browser still lands on zh-CN until ?lang= says otherwise.
     app.use('*', async (c, next) => {
-        const acceptLanguage = getRequestHeader(c.req, 'Accept-Language');
-        const lang = c.req.query('lang') || acceptLanguage?.split(',')[0] || 'zh-CN';
+        const lang = c.req.query('lang') || 'zh-CN';
         c.set('lang', lang);
         c.set('t', createTranslator(lang));
         await next();

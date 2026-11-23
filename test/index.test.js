@@ -23,26 +23,26 @@ describe('Worker', () => {
         expect(text).toContain('<!DOCTYPE html>');
     });
 
-    it('links to Chinese from the English homepage and preserves configId', async () => {
+    it('defaults to Chinese even when the browser asks for English', async () => {
         const res = await app.request('http://example.com/?configId=clash_saved', {
             headers: { 'Accept-Language': 'en-GB,en;q=0.9' }
         });
         const text = await res.text();
 
-        expect(text).toContain('<html lang="en-US"');
-        expect(text).toContain('Input Source');
-        expect(text).toContain('href="?configId=clash_saved&amp;lang=zh-CN" lang="zh-CN"');
+        expect(text).toContain('<html lang="zh-CN"');
+        expect(text).toContain('输入源');
+        expect(text).toContain('href="?configId=clash_saved&amp;lang=en-US" lang="en-US"');
     });
 
-    it('uses the chosen language over the browser language and links back to English', async () => {
-        const res = await app.request('http://example.com/?lang=zh-CN', {
-            headers: { 'Accept-Language': 'en-US' }
+    it('switches to English only when lang is set explicitly', async () => {
+        const res = await app.request('http://example.com/?lang=en-US', {
+            headers: { 'Accept-Language': 'zh-CN,zh;q=0.9' }
         });
         const text = await res.text();
 
-        expect(text).toContain('<html lang="zh-CN"');
-        expect(text).toContain('输入源');
-        expect(text).toContain('href="?lang=en-US" lang="en-US"');
+        expect(text).toContain('<html lang="en-US"');
+        expect(text).toContain('Input Source');
+        expect(text).toContain('href="?lang=zh-CN" lang="zh-CN"');
     });
 
     it('responds with 404 for unknown paths', async () => {
