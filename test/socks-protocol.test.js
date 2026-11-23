@@ -249,3 +249,45 @@ describe('SOCKS share links', () => {
         });
     });
 });
+
+describe('SOCKS proxies in Clash YAML', () => {
+    const yamlInput = `proxies:
+  - name: Oxylabs-US-ISP-1
+    type: socks5
+    server: disp.example.com
+    port: 8001
+    username: user-disp_c3cf0111
+    password: secret
+    udp: true`;
+
+    it('parses a socks5 entry into a Clash socks5 proxy', async () => {
+        const config = yaml.load(await new ClashConfigBuilder(yamlInput, 'minimal', [], null, 'zh-CN').build());
+
+        expect(config.proxies).toEqual([
+            {
+                name: 'Oxylabs-US-ISP-1',
+                type: 'socks5',
+                server: 'disp.example.com',
+                port: 8001,
+                username: 'user-disp_c3cf0111',
+                password: 'secret',
+                udp: true
+            }
+        ]);
+    });
+
+    it('parses a socks5 entry into a sing-box socks outbound', async () => {
+        const config = await new SingboxConfigBuilder(yamlInput, 'minimal', [], null, 'zh-CN').build();
+        const outbound = config.outbounds.find(item => item.type === 'socks');
+
+        expect(outbound).toEqual({
+            tag: 'Oxylabs-US-ISP-1',
+            type: 'socks',
+            server: 'disp.example.com',
+            server_port: 8001,
+            version: '5',
+            username: 'user-disp_c3cf0111',
+            password: 'secret'
+        });
+    });
+});
