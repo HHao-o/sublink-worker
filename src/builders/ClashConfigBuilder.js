@@ -48,7 +48,7 @@ function getClashUdpValue(proxy, defaultEnabled = true) {
 }
 
 export class ClashConfigBuilder extends BaseConfigBuilder {
-    constructor(inputString, selectedRules, customRules, baseConfig, lang, userAgent, groupByCountry = false, enableClashUI = false, externalController, externalUiDownloadUrl, includeAutoSelect = true) {
+    constructor(inputString, selectedRules, customRules, baseConfig, lang, userAgent, groupByCountry = false, enableClashUI = false, externalController, externalUiDownloadUrl, includeAutoSelect = true, chainInput = null) {
         if (!baseConfig) {
             baseConfig = CLASH_CONFIG;
         }
@@ -60,6 +60,66 @@ export class ClashConfigBuilder extends BaseConfigBuilder {
         this.enableClashUI = enableClashUI;
         this.externalController = externalController;
         this.externalUiDownloadUrl = externalUiDownloadUrl;
+        this.chainInput = typeof chainInput === 'string' && chainInput.trim() ? chainInput : null;
+        // Front nodes stay in `proxies` (dialer-proxy must reference a real
+        // entry) but are hidden from every selector built over the proxy list.
+        this.chainFrontNames = new Set();
+    }
+
+    async build() {
+        // Chain mode cannot use proxy-providers: the back proxies need a
+        // concrete dialer-proxy target that lives in this same config.
+        const backItems = await this.parseInputItems(this.inputString, { allowProvider: !this.chainInput });
+        const frontItems = this.chainInput
+            ? await this.parseInputItems(this.chainInput, { allowProvider: false, applyOverrides: false })
+            : [];
+
+        this.addCustomItems(backItems);
+        if (frontItems.length > 0) {
+            this.applyChainProxy(frontItems);
+        }
+
+        this.addSelectors();
+        return this.formatConfig();
+    }
+
+    /**
+     * Wire back proxies through a single front group.
+     * Users pick the upstream node inside the group instead of editing every
+     * proxy, and front nodes never become selectable exits themselves.
+     */
+    applyChainProxy(frontItems) {
+        this.config.proxies = this.config.proxies || [];
+
+        const frontNames = [];
+        frontItems.forEach(item => {
+            if (!item?.tag) return;
+            const converted = this.convertProxy(item);
+            if (!converted) return;
+            const before = this.config.proxies.length;
+            this.addProxyToConfig(converted);
+            const added = this.config.proxies[this.config.proxies.length - 1];
+            if (this.config.proxies.length > before && added?.name) {
+                frontNames.push(added.name);
+                this.chainFrontNames.add(added.name);
+            }
+        });
+
+        if (frontNames.length === 0) return;
+
+        const groupName = this.t('outboundNames.Chain Front');
+        this.config.proxies.forEach(proxy => {
+            if (proxy?.name && !this.chainFrontNames.has(proxy.name)) {
+                proxy['dialer-proxy'] = groupName;
+            }
+        });
+
+        this.config['proxy-groups'] = this.config['proxy-groups'] || [];
+        this.config['proxy-groups'].push({
+            type: 'select',
+            name: groupName,
+            proxies: frontNames
+        });
     }
 
     /**
@@ -121,7 +181,10 @@ export class ClashConfigBuilder extends BaseConfigBuilder {
     }
 
     getProxies() {
-        return this.config.proxies || [];
+        const proxies = this.config.proxies || [];
+        if (this.chainFrontNames.size === 0) return proxies;
+        // Chain front nodes must not appear in any selector as a direct exit.
+        return proxies.filter(proxy => !this.chainFrontNames.has(proxy?.name));
     }
 
     getProxyName(proxy) {

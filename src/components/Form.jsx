@@ -50,11 +50,16 @@ export const Form = (props) => {
       <form {...{'x-on:submit.prevent': 'submitForm'}} class="grid items-start gap-6 lg:grid-cols-2 lg:gap-8">
 
       {/* Input Section */}
-      <div class="min-w-0 lg:sticky lg:top-24 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 transition-shadow duration-300 hover:shadow-md group">
+      <div class="min-w-0 lg:sticky lg:top-24 flex flex-col gap-4">
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 transition-shadow duration-300 hover:shadow-md group">
         <TextareaWithActions
           id="input"
           name="input"
-          label={t('shareUrls')}
+          label={
+            <span x-text={`chainMode ? ${JSON.stringify(t('chainFrontLabel'))} : ${JSON.stringify(t('shareUrls'))}`}>
+              {t('shareUrls')}
+            </span>
+          }
           labelPrefix={
             <span class="w-8 h-8 rounded-lg bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 flex items-center justify-center">
               <i class="fas fa-link text-sm"></i>
@@ -93,6 +98,75 @@ export const Form = (props) => {
             }
           ]}
         />
+          <label class="mt-4 flex items-center justify-between gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-700/30 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors cursor-pointer">
+            <span class="flex items-center gap-3">
+              <span class="w-8 h-8 shrink-0 rounded-lg bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 flex items-center justify-center">
+                <i class="fas fa-link text-sm"></i>
+              </span>
+              <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                <span class="block">{t('chainMode')}</span>
+                <span class="block text-xs font-normal text-gray-500 dark:text-gray-400 mt-0.5">{t('chainModeTip')}</span>
+              </span>
+            </span>
+            <span class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" x-model="chainMode" class="sr-only peer" />
+              <span class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 dark:peer-focus:ring-primary-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary-600"></span>
+            </span>
+          </label>
+        </div>
+
+        <div
+          x-cloak
+          x-show="chainMode"
+          {...{
+            'x-transition:enter': 'transition ease-out duration-200',
+            'x-transition:enter-start': 'opacity-0 transform -translate-y-2',
+            'x-transition:enter-end': 'opacity-100 transform translate-y-0'
+          }}
+          class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 group"
+        >
+          <TextareaWithActions
+            id="chainInput"
+            name="chainInput"
+            label={t('chainBackLabel')}
+            labelPrefix={
+              <span class="w-8 h-8 rounded-lg bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 flex items-center justify-center">
+                <i class="fas fa-layer-group text-sm"></i>
+              </span>
+            }
+            model="chainInput"
+            rows={5}
+            placeholder={t('urlPlaceholder')}
+            labelActionsWrapperClass="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+            labelActions={[
+              {
+                key: 'paste',
+                icon: 'fas fa-paste',
+                label: t('paste'),
+                hideLabelOnMobile: true,
+                className:
+                  'px-2 py-1 text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded hover:bg-primary-50 dark:hover:bg-primary-900/20 hover:text-primary-600 dark:hover:text-primary-400 transition-colors flex items-center gap-1',
+                title: t('paste'),
+                attrs: {
+                  'x-on:click': "navigator.clipboard.readText().then(text => chainInput = text).catch(() => {})"
+                }
+              },
+              {
+                key: 'clear',
+                icon: 'fas fa-times',
+                label: t('clear'),
+                hideLabelOnMobile: true,
+                className:
+                  'px-2 py-1 text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 transition-colors flex items-center gap-1',
+                title: t('clear'),
+                attrs: {
+                  'x-on:click': "chainInput = ''",
+                  'x-show': 'chainInput'
+                }
+              }
+            ]}
+          />
+        </div>
       </div>
 
       <div class="min-w-0 flex flex-col gap-4">
@@ -357,6 +431,11 @@ class="px-6 py-3.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 bo
           </span>
           {t('subscriptionLinks')}
         </h2>
+      </div>
+
+      <div x-show="chainMode" x-cloak class="mb-4 flex items-start gap-2 px-4 py-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-sm text-amber-700 dark:text-amber-300">
+        <i class="fas fa-info-circle mt-0.5"></i>
+        <span>{t('chainClashOnlyTip')}</span>
       </div>
 
       <div class="mt-6 space-y-4">

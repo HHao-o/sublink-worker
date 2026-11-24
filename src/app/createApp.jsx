@@ -132,6 +132,7 @@ export function createApp(bindings = {}) {
             const externalController = c.req.query('external_controller');
             const externalUiDownloadUrl = c.req.query('external_ui_download_url');
             const configId = c.req.query('configId');
+            const chainInput = c.req.query('chain');
             const lang = c.get('lang');
 
             let baseConfig;
@@ -151,7 +152,8 @@ export function createApp(bindings = {}) {
                 enableClashUI,
                 externalController,
                 externalUiDownloadUrl,
-                includeAutoSelect
+                includeAutoSelect,
+                chainInput
             );
             await builder.build();
             const userinfo = builder.getSubscriptionUserinfo();

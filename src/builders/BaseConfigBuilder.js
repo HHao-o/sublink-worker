@@ -28,17 +28,26 @@ export class BaseConfigBuilder {
     }
 
     async parseCustomItems() {
-        const input = this.inputString || '';
+        return this.parseInputItems(this.inputString);
+    }
+
+    /**
+     * Parse one input blob into proxy IR items.
+     * Chain-front parsing must not register providers (front nodes stay local)
+     * nor let the front config override the base config, so both are switchable.
+     */
+    async parseInputItems(input, { allowProvider = true, applyOverrides = true } = {}) {
+        const text = input || '';
         const parsedItems = [];
 
         // Import the content parser for direct input parsing
         const { parseSubscriptionContent } = await import('../parsers/subscription/subscriptionContentParser.js');
 
         // Try to parse the entire input as a config format (Sing-Box JSON or Clash YAML)
-        const directResult = parseSubscriptionContent(input);
+        const directResult = parseSubscriptionContent(text);
         if (directResult && typeof directResult === 'object' && directResult.type) {
             // It's a parsed config (singboxConfig or yamlConfig)
-            if (directResult.config) {
+            if (directResult.config && applyOverrides) {
                 this.applyConfigOverrides(directResult.config);
             }
             if (Array.isArray(directResult.proxies)) {
@@ -52,15 +61,15 @@ export class BaseConfigBuilder {
         }
 
         // If direct parsing didn't work, check for Base64 encoded content
-        const isBase64Like = /^[A-Za-z0-9+/=\r\n]+$/.test(input) && input.replace(/[\r\n]/g, '').length % 4 === 0;
+        const isBase64Like = /^[A-Za-z0-9+/=\r\n]+$/.test(text) && text.replace(/[\r\n]/g, '').length % 4 === 0;
         if (isBase64Like) {
             try {
-                const sanitized = input.replace(/\s+/g, '');
+                const sanitized = text.replace(/\s+/g, '');
                 const decodedWhole = decodeBase64(sanitized);
                 if (typeof decodedWhole === 'string') {
                     const decodedResult = parseSubscriptionContent(decodedWhole);
                     if (decodedResult && typeof decodedResult === 'object' && decodedResult.type) {
-                        if (decodedResult.config) {
+                        if (decodedResult.config && applyOverrides) {
                             this.applyConfigOverrides(decodedResult.config);
                         }
                         if (Array.isArray(decodedResult.proxies)) {
@@ -77,7 +86,7 @@ export class BaseConfigBuilder {
         }
 
         // Otherwise, line-by-line processing (URLs, subscription content, remote lists, etc.)
-        const urls = input.split('\n').filter(url => url.trim() !== '');
+        const urls = text.split('\n').filter(url => url.trim() !== '');
         for (const url of urls) {
             let processedUrls = tryDecodeSubscriptionLines(url);
             if (!Array.isArray(processedUrls)) {
@@ -96,12 +105,12 @@ export class BaseConfigBuilder {
                         if (fetchResult) {
                             const { content, format, url: originalUrl, subscriptionUserinfo } = fetchResult;
 
-                            if (subscriptionUserinfo && !this.subscriptionUserinfo) {
+                            if (subscriptionUserinfo && !this.subscriptionUserinfo && applyOverrides) {
                                 this.subscriptionUserinfo = subscriptionUserinfo;
                             }
 
                             // If format is compatible with target client, use as provider
-                            if (this.isCompatibleProviderFormat(format)) {
+                            if (allowProvider && this.isCompatibleProviderFormat(format)) {
                                 this.providerUrls.push(originalUrl);
                                 // Content is already fetched; keep node names so country
                                 // groups can be built over provider members later.
@@ -112,7 +121,7 @@ export class BaseConfigBuilder {
                             // Otherwise parse the content as usual
                             const result = parseSubscriptionContent(content);
                             if (result && typeof result === 'object' && (result.type === 'yamlConfig' || result.type === 'singboxConfig' || result.type === 'surgeConfig')) {
-                                if (result.config) {
+                                if (result.config && applyOverrides) {
                                     this.applyConfigOverrides(result.config);
                                 }
                                 if (Array.isArray(result.proxies)) {
@@ -148,7 +157,7 @@ export class BaseConfigBuilder {
                 const result = await ProxyParser.parse(processedUrl, this.userAgent);
                 // Handle yamlConfig, singboxConfig, and surgeConfig types (they have the same structure)
                 if (result && typeof result === 'object' && (result.type === 'yamlConfig' || result.type === 'singboxConfig' || result.type === 'surgeConfig')) {
-                    if (result.config) {
+                    if (result.config && applyOverrides) {
                         this.applyConfigOverrides(result.config);
                     }
                     if (Array.isArray(result.proxies)) {

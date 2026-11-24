@@ -71,6 +71,8 @@ export const formLogicFn = (t) => {
 
         return {
             input: '',
+            chainMode: false,
+            chainInput: '',
             showAdvanced: false,
             // Accordion states for each section (二级手风琴状态)
             accordionSections: {
@@ -139,6 +141,8 @@ export const formLogicFn = (t) => {
                 this.configEditor = localStorage.getItem('configEditor') || '';
                 this.configType = localStorage.getItem('configType') || 'singbox';
                 this.customShortCode = localStorage.getItem('customShortCode') || '';
+                this.chainMode = localStorage.getItem('chainMode') === 'true';
+                this.chainInput = localStorage.getItem('chainInput') || '';
                 const initialUrlParams = new URLSearchParams(window.location.search);
                 this.currentConfigId = initialUrlParams.get('configId') || '';
 
@@ -181,6 +185,8 @@ export const formLogicFn = (t) => {
                     this.resetConfigValidation();
                 });
                 this.$watch('customShortCode', val => localStorage.setItem('customShortCode', val));
+                this.$watch('chainMode', val => localStorage.setItem('chainMode', val));
+                this.$watch('chainInput', val => localStorage.setItem('chainInput', val));
                 this.$watch('accordionSections', val => localStorage.setItem('accordionSections', JSON.stringify(val)), { deep: true });
             },
 
@@ -356,6 +362,7 @@ export const formLogicFn = (t) => {
             clearAll() {
                 if (confirm(window.APP_TRANSLATIONS.confirmClearAll)) {
                     this.input = '';
+                    this.chainInput = '';
                     this.generatedLinks = null;
                     this.shortenedLinks = null;
                     this.customShortCode = '';
@@ -385,7 +392,9 @@ export const formLogicFn = (t) => {
                     // Construct URLs
                     const origin = window.location.origin;
                     const params = new URLSearchParams();
-                    params.append('config', this.input);
+                    // Chain mode swaps the boxes: `config` carries the back node
+                    // (the one actually converted), `chain` the front node.
+                    params.append('config', this.chainMode ? this.chainInput : this.input);
                     params.append('ua', this.customUA);
                     params.append('selectedRules', JSON.stringify(this.selectedRules));
                     params.append('customRules', JSON.stringify(customRules));
@@ -404,11 +413,17 @@ export const formLogicFn = (t) => {
                     }
 
                     const queryString = params.toString();
+                    // Only Clash understands the chain parameter; the other
+                    // formats would silently drop the front node.
+                    const clashParams = new URLSearchParams(params);
+                    if (this.chainMode && this.input.trim()) {
+                        clashParams.append('chain', this.input);
+                    }
 
                     this.generatedLinks = {
                         xray: origin + '/xray?' + queryString,
                         singbox: origin + '/singbox?' + queryString,
-                        clash: origin + '/clash?' + queryString,
+                        clash: origin + '/clash?' + clashParams.toString(),
                         surge: origin + '/surge?' + queryString
                     };
 
@@ -596,6 +611,15 @@ export const formLogicFn = (t) => {
                 const config = params.get('config');
                 if (config) {
                     this.input = config;
+                }
+
+                // Chain mode swaps the two boxes: `chain` holds the front node
+                // and `config` the back node that actually gets converted.
+                const chain = params.get('chain');
+                if (chain) {
+                    this.chainMode = true;
+                    this.chainInput = config || '';
+                    this.input = chain;
                 }
 
                 // Extract selectedRules
