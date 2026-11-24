@@ -32,4 +32,15 @@ describe('formLogic toString fix', () => {
     expect(typeof data.toggleAccordion).toBe('function');
     expect(data.showAdvanced).toBe(false);
   });
+
+  it('keeps the chain parameter in the query string shared by all four links', () => {
+    const src = formLogicFn.toString();
+
+    // The short-link flow reuses one code for all four formats, so any
+    // format-specific parameter would be overwritten by the last write.
+    expect(src).toContain("params.append('chain', this.input)");
+
+    const uses = src.match(/(?:xray|singbox|clash|surge): origin \+ '\/\w+\?' \+ queryString/g) || [];
+    expect(uses).toHaveLength(4);
+  });
 });

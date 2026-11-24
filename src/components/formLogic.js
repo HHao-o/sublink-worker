@@ -412,18 +412,19 @@ export const formLogicFn = (t) => {
                         params.append('configId', configId);
                     }
 
-                    const queryString = params.toString();
-                    // Only Clash understands the chain parameter; the other
-                    // formats would silently drop the front node.
-                    const clashParams = new URLSearchParams(params);
+                    // All four links must share one identical query string: the
+                    // short-link flow reuses a single code for every format, so
+                    // any parameter present in only one of them would be
+                    // overwritten by the last write and silently disappear.
                     if (this.chainMode && this.input.trim()) {
-                        clashParams.append('chain', this.input);
+                        params.append('chain', this.input);
                     }
+                    const queryString = params.toString();
 
                     this.generatedLinks = {
                         xray: origin + '/xray?' + queryString,
                         singbox: origin + '/singbox?' + queryString,
-                        clash: origin + '/clash?' + clashParams.toString(),
+                        clash: origin + '/clash?' + queryString,
                         surge: origin + '/surge?' + queryString
                     };
 
