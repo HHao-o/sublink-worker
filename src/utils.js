@@ -92,6 +92,72 @@ export function base64ToBinary(base64String) {
 	return binaryString;
 }
 
+// Pasted lists sometimes join links with a space or a comma. Without this,
+// `parseUrlParams` splits on the first '://' and silently drops every following
+// link into the first node's fragment. A scheme only starts a new link when it
+// is preceded by a separator, so `?url=https://...` and an SNI annotation like
+// `tls.example.com (http://...)` stay inside the link they belong to.
+const LINK_SCHEMES_BY_LENGTH = [
+	'socks5+tls',
+	'hysteria2',
+	'hysteria',
+	'vmess',
+	'vless',
+	'trojan',
+	'anytls',
+	'socks5',
+	'socks4',
+	'https',
+	'http',
+	'socks',
+	'tuic',
+	'hy2',
+	'ss'
+];
+const LINK_SEPARATORS = new Set([' ', '\t', ',', ';', '\r', '\n']);
+
+export function splitConcatenatedLinks(input) {
+	if (typeof input !== 'string' || input.trim() === '') {
+		return [input];
+	}
+
+	const lower = input.toLowerCase();
+	const cuts = [];
+	for (let idx = lower.indexOf('://'); idx !== -1; idx = lower.indexOf('://', idx + 3)) {
+		for (const scheme of LINK_SCHEMES_BY_LENGTH) {
+			const start = idx - scheme.length;
+			if (start <= 0 || lower.slice(start, idx) !== scheme) {
+				continue;
+			}
+			if (!LINK_SEPARATORS.has(input[start - 1])) {
+				break;
+			}
+			cuts.push(start);
+			break;
+		}
+	}
+
+	if (cuts.length === 0) {
+		return [input];
+	}
+
+	const parts = [];
+	let cursor = 0;
+	for (const cut of cuts) {
+		parts.push(input.slice(cursor, cut));
+		cursor = cut;
+	}
+	parts.push(input.slice(cursor));
+
+	const cleaned = parts
+		// A comma or semicolon used as the separator stays glued to the link
+		// before it and would leak into that node's name.
+		.map(part => part.replace(/[,;]+$/, '').trim())
+		.filter(part => part !== '');
+
+	return cleaned.length > 1 ? cleaned : [input];
+}
+
 export function tryDecodeSubscriptionLines(input, { decodeUriComponent = false } = {}) {
 	if (typeof input !== 'string') {
 		return input;

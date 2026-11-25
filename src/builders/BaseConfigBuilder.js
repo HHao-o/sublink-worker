@@ -1,5 +1,5 @@
 import { ProxyParser } from '../parsers/index.js';
-import { createStableProviderName, deepCopy, tryDecodeSubscriptionLines, decodeBase64 } from '../utils.js';
+import { createStableProviderName, deepCopy, tryDecodeSubscriptionLines, decodeBase64, splitConcatenatedLinks } from '../utils.js';
 import { createTranslator } from '../i18n/index.js';
 import { generateRules, getOutbounds, PREDEFINED_RULE_SETS } from '../config/index.js';
 
@@ -86,12 +86,16 @@ export class BaseConfigBuilder {
         }
 
         // Otherwise, line-by-line processing (URLs, subscription content, remote lists, etc.)
-        const urls = text.split('\n').filter(url => url.trim() !== '');
+        const urls = text
+            .split('\n')
+            .filter(url => url.trim() !== '')
+            .flatMap(url => splitConcatenatedLinks(url));
         for (const url of urls) {
             let processedUrls = tryDecodeSubscriptionLines(url);
             if (!Array.isArray(processedUrls)) {
                 processedUrls = [processedUrls];
             }
+            processedUrls = processedUrls.flatMap(item => splitConcatenatedLinks(item));
 
             for (const processedUrl of processedUrls) {
                 const trimmedUrl = typeof processedUrl === 'string' ? processedUrl.trim() : '';
