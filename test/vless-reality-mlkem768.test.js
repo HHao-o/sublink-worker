@@ -4,7 +4,10 @@ import { ClashConfigBuilder } from '../src/builders/ClashConfigBuilder.js';
 import { SingboxConfigBuilder } from '../src/builders/SingboxConfigBuilder.js';
 import { ProxyParser } from '../src/parsers/ProxyParser.js';
 
-const REALITY_URI = 'vless://00000000-0000-4000-8000-000000000001@node.example.net:443?encryption=none&flow=xtls-rprx-vision&fp=chrome&pbk=TEST_PUBLIC_KEY&security=reality&sid=c94&sni=front.example.org&type=tcp';
+// A REALITY key must decode to 32 bytes; builders drop nodes whose key does
+// not, so the fixture needs a well-formed one.
+const PBK = 'LWfC_chpo4uDtzJ9VVnuTcf6zTzWKx-LCJAE2Ltl7h4';
+const REALITY_URI = `vless://00000000-0000-4000-8000-000000000001@node.example.net:443?encryption=none&flow=xtls-rprx-vision&fp=chrome&pbk=${PBK}&security=reality&sid=c94&sni=front.example.org&type=tcp`;
 const OPTION = 'support-x25519mlkem768';
 const CASES = [
     ['true', true],
@@ -41,7 +44,7 @@ describe('VLESS Reality ML-KEM option', () => {
             servername: 'front.example.org',
             network: 'tcp',
             'reality-opts': {
-                'public-key': 'TEST_PUBLIC_KEY',
+                'public-key': PBK,
                 'short-id': 'c94',
                 ...(expected !== undefined ? { [OPTION]: expected } : {})
             },
@@ -69,7 +72,7 @@ describe('VLESS Reality ML-KEM option', () => {
     ${uuid ? `uuid: ${uuid}` : 'password: test-password'}
     tls: true
     reality-opts:
-      public-key: TEST_PUBLIC_KEY
+      public-key: ${PBK}
       short-id: c94
       ${OPTION}: true`;
         const builder = new ClashConfigBuilder(input, 'minimal', [], null, 'en-US', 'mihomo/1.0');
@@ -115,7 +118,7 @@ describe('VLESS Reality ML-KEM option', () => {
             const config = yaml.load(await builder.build());
 
             expect(config.proxies[0]['reality-opts']).toEqual({
-                'public-key': 'TEST_PUBLIC_KEY',
+                'public-key': PBK,
                 'short-id': 'c94',
                 ...(expected !== undefined ? { [OPTION]: expected } : {})
             });

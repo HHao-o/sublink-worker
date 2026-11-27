@@ -1,7 +1,7 @@
 
 import { SING_BOX_CONFIG, generateRuleSets, generateRules, getOutbounds, PREDEFINED_RULE_SETS, DIRECT_DEFAULT_RULES, REJECT_ACTION_RULES } from '../config/index.js';
 import { BaseConfigBuilder } from './BaseConfigBuilder.js';
-import { deepCopy, groupProxiesByCountry } from '../utils.js';
+import { deepCopy, groupProxiesByCountry, isValidRealityPublicKey } from '../utils.js';
 import { addProxyWithDedup } from './helpers/proxyHelpers.js';
 import { buildSelectorMembers as buildSelectorMemberList, buildNodeSelectMembers, buildCustomRuleMembers, uniqueNames } from './helpers/groupBuilder.js';
 import { normalizeGroupName } from './helpers/groupNameUtils.js';
@@ -110,6 +110,12 @@ export class SingboxConfigBuilder extends BaseConfigBuilder {
         if (proxy.type === 'anytls' && this.singboxVersion === '1.11') return null;
         // Native sing-box SOCKS outbounds cannot enable TLS directly.
         if (proxy.type === 'socks' && proxy.tls?.enabled) return null;
+        // sing-box refuses to start when a REALITY key is not a 32-byte X25519
+        // key, which would take down the whole config, not just this outbound.
+        if (proxy.type === 'vless' && proxy.tls?.reality?.enabled && !isValidRealityPublicKey(proxy.tls.reality.public_key)) {
+            console.warn(`Skipping ${proxy.tag}: invalid REALITY public key`);
+            return null;
+        }
 
         // Create a shallow copy to avoid mutating the original
         const sanitized = { ...proxy };

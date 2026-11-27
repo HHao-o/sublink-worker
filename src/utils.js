@@ -335,6 +335,22 @@ export function parseServerInfo(serverInfo) {
 	return { host, port: parseInt(port) };
 }
 
+// REALITY keys are 32-byte X25519 public keys in unpadded base64url (43 chars).
+// mihomo and sing-box both reject the entire profile when one key is malformed,
+// so a builder has to drop such nodes instead of emitting them.
+export function isValidRealityPublicKey(publicKey) {
+	if (typeof publicKey !== 'string' || publicKey.length === 0) {
+		return false;
+	}
+	const normalized = publicKey.replace(/-/g, '+').replace(/_/g, '/');
+	const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
+	try {
+		return atob(padded).length === 32;
+	} catch (_) {
+		return false;
+	}
+}
+
 export function parseUrlParams(url) {
 	const [, rest] = url.split('://');
 	const [addressPart, ...remainingParts] = rest.split('?');

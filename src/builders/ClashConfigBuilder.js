@@ -1,7 +1,7 @@
 import yaml from 'js-yaml';
 import { CLASH_CONFIG, generateRules, generateClashRuleSets, getOutbounds, PREDEFINED_RULE_SETS, DIRECT_DEFAULT_RULES } from '../config/index.js';
 import { BaseConfigBuilder } from './BaseConfigBuilder.js';
-import { deepCopy, groupProxiesByCountry, buildCountryNameFilter } from '../utils.js';
+import { deepCopy, groupProxiesByCountry, buildCountryNameFilter, isValidRealityPublicKey } from '../utils.js';
 import { addProxyWithDedup } from './helpers/proxyHelpers.js';
 import { buildSelectorMembers, buildNodeSelectMembers, buildCustomRuleMembers, uniqueNames } from './helpers/groupBuilder.js';
 import { emitClashRules, sanitizeClashProxyGroups } from './helpers/clashConfigUtils.js';
@@ -251,6 +251,12 @@ export class ClashConfigBuilder extends BaseConfigBuilder {
                     udp: getClashUdpValue(proxy)
                 };
             case 'vless':
+                // One malformed REALITY key makes mihomo reject the whole
+                // profile, so drop the node rather than poison every other one.
+                if (proxy.tls?.reality?.enabled && !isValidRealityPublicKey(proxy.tls.reality.public_key)) {
+                    console.warn(`Skipping ${proxy.tag}: invalid REALITY public key`);
+                    return null;
+                }
                 return {
                     name: proxy.tag,
                     type: proxy.type,
