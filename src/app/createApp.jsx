@@ -331,7 +331,11 @@ export function createApp(bindings = {}) {
     app.get('/shorten-v2', shortenHandler(async (c) => ({ url: c.req.query('url'), shortCode: c.req.query('shortCode') })));
     app.post('/shorten-v2', shortenHandler(async (c) => (await c.req.json().catch(() => null)) ?? {}));
 
-    const redirectHandler = (prefix) => async (c) => {
+    // Serving the config directly instead of redirecting keeps the long query
+    // out of a Location header: a full node list pushes it past 16 KB, which is
+    // the HTTP/2 header-list limit hyper/reqwest clients enforce, and they fail
+    // the stream before they ever see the redirect target.
+    const shortLinkHandler = (target) => async (c) => {
         try {
             const code = c.req.param('code');
             const shortLinks = requireShortLinkService(services.shortLinks);
@@ -339,16 +343,22 @@ export function createApp(bindings = {}) {
             if (!originalParam) return c.text('Short URL not found', 404);
 
             const url = new URL(c.req.url);
-            return c.redirect(`${url.origin}/${prefix}${originalParam}`);
+            url.pathname = `/${target}`;
+            url.search = originalParam;
+            const forwarded = new Request(url.toString(), {
+                method: 'GET',
+                headers: c.req.raw.headers
+            });
+            return await app.fetch(forwarded, c.env);
         } catch (error) {
             return handleError(c, error, runtime.logger);
         }
     };
 
-    app.get('/s/:code', redirectHandler('surge'));
-    app.get('/b/:code', redirectHandler('singbox'));
-    app.get('/c/:code', redirectHandler('clash'));
-    app.get('/x/:code', redirectHandler('xray'));
+    app.get('/s/:code', shortLinkHandler('surge'));
+    app.get('/b/:code', shortLinkHandler('singbox'));
+    app.get('/c/:code', shortLinkHandler('clash'));
+    app.get('/x/:code', shortLinkHandler('xray'));
 
     app.post('/config', async (c) => {
         try {
