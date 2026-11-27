@@ -110,6 +110,10 @@ export const formLogicFn = (t) => {
             parseDebounceTimer: null,
             parsingNodes: false,
             parsedNodes: null,
+            updatingNodeTag: null,
+            updateDraft: '',
+            updateError: '',
+            updatingNode: false,
             // These will be populated from window.APP_TRANSLATIONS
             processingText: '',
             convertText: '',
@@ -479,6 +483,74 @@ export const formLogicFn = (t) => {
                     alert(window.APP_TRANSLATIONS.parseNodesFailed || '解析失败');
                 } finally {
                     this.parsingNodes = false;
+                }
+            },
+
+            startUpdateNode(node) {
+                this.updatingNodeTag = node.tag;
+                this.updateDraft = '';
+                this.updateError = '';
+            },
+
+            cancelUpdateNode() {
+                this.updatingNodeTag = null;
+                this.updateDraft = '';
+                this.updateError = '';
+            },
+
+            async confirmUpdateNode(node) {
+                const draft = this.updateDraft.trim();
+                const tr = window.APP_TRANSLATIONS || {};
+                if (!draft) {
+                    this.updateError = tr.updateNodeEmpty || '请粘贴新链接';
+                    return;
+                }
+
+                this.updatingNode = true;
+                this.updateError = '';
+                try {
+                    const res = await fetch('/parse', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ config: draft })
+                    });
+                    if (!res.ok) {
+                        throw new Error(await res.text());
+                    }
+                    const data = await res.json();
+                    const parsed = Array.isArray(data?.proxies) ? data.proxies : [];
+
+                    if (parsed.length !== 1) {
+                        this.updateError = tr.updateNodeSingleOnly || '一次只能替换一个节点';
+                        return;
+                    }
+                    if (parsed[0].type !== node.type) {
+                        this.updateError = `${tr.updateNodeTypeMismatch || '类型不匹配，需要'} ${node.type}`;
+                        return;
+                    }
+
+                    const source = node.role === 'front' ? this.input : (this.chainMode ? this.chainInput : this.input);
+                    const lines = source.split('\n');
+                    if (node.line == null || node.line >= lines.length) {
+                        this.updateError = tr.updateNodeNoLine || '无法定位原始行，请手动修改输入源';
+                        return;
+                    }
+
+                    lines[node.line] = draft;
+                    const joined = lines.join('\n');
+                    if (node.role === 'front' || !this.chainMode) {
+                        this.input = joined;
+                    } else {
+                        this.chainInput = joined;
+                    }
+
+                    this.cancelUpdateNode();
+                    await this.parseNodes();
+                } catch (error) {
+                    console.error('Failed to update node:', error);
+                    this.updateError = tr.updateNodeFailed || '更新失败';
+                } finally {
+                    this.updatingNode = false;
                 }
             },
 

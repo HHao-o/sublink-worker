@@ -461,10 +461,46 @@ class="px-6 py-3.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 bo
               <span class="shrink-0 text-[11px] px-2 py-0.5 rounded-md bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400" x-text="node.type"></span>
             </div>
             <div class="mt-1 truncate font-mono text-xs text-gray-500 dark:text-gray-400" x-text="`${node.server}:${node.port}`"></div>
-            <div class="mt-2 flex flex-wrap gap-1">
+            <div class="mt-2 flex flex-wrap items-center gap-1">
               <span x-show="node.udp" class="text-[11px] px-1.5 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300">UDP</span>
               <span x-show="node.role === 'front'" class="text-[11px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">{t('nodeRoleFront')}</span>
               <span x-show="node.role === 'back'" class="text-[11px] px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300">{t('nodeRoleBack')}</span>
+              <button
+                type="button"
+                x-show="node.line !== null && node.line !== undefined"
+                x-on:click="startUpdateNode(node)"
+                class="ml-auto text-[11px] px-2 py-0.5 rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-primary-50 dark:hover:bg-primary-900/20 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+              >
+                <i class="fas fa-rotate mr-1"></i>{t('updateNode')}
+              </button>
+            </div>
+
+            <div x-show="updatingNodeTag === node.tag" x-cloak class="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 space-y-2">
+              <input
+                type="text"
+                x-model="updateDraft"
+                placeholder={t('updateNodePlaceholder')}
+                class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-mono text-xs focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              />
+              <p x-show="updateError" x-text="updateError" class="text-xs text-red-500"></p>
+              <div class="flex gap-2">
+                <button
+                  type="button"
+                  x-on:click="confirmUpdateNode(node)"
+                  x-bind:disabled="updatingNode"
+                  class="px-3 py-1.5 rounded-lg bg-primary-600 hover:bg-primary-700 text-white text-xs font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  <i class="fas" x-bind:class="updatingNode ? 'fa-spinner fa-spin' : 'fa-check'"></i>
+                  {t('updateNodeConfirm')}
+                </button>
+                <button
+                  type="button"
+                  x-on:click="cancelUpdateNode()"
+                  class="px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                >
+                  {t('updateNodeCancel')}
+                </button>
+              </div>
             </div>
           </div>
         </template>

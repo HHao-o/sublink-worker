@@ -77,4 +77,32 @@ describe('POST /parse', () => {
         expect(res.status).toBe(200);
         expect(json.proxies).toEqual([]);
     });
+
+    it('reports the source line for a line-per-node list', async () => {
+        const { json } = await parse({ config: BACK });
+
+        expect(json.proxies.map(p => p.line)).toEqual([0, 1]);
+    });
+
+    it('reports no line when the input is not a plain list', async () => {
+        const yamlConfig = `proxies:
+  - name: yaml-node
+    type: ss
+    server: 1.2.3.4
+    port: 443
+    cipher: aes-128-gcm
+    password: p`;
+        const { json } = await parse({ config: yamlConfig });
+
+        expect(json.proxies).toHaveLength(1);
+        expect(json.proxies[0].line).toBeNull();
+    });
+
+    it('matches the line of an encoded node name', async () => {
+        const encoded = 'vless://11111111-1111-1111-1111-111111111111@1.2.3.4:443?type=tcp&security=tls#My%20Node';
+        const { json } = await parse({ config: encoded });
+
+        expect(json.proxies[0].tag).toBe('My Node');
+        expect(json.proxies[0].line).toBe(0);
+    });
 });

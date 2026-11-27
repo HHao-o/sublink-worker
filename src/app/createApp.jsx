@@ -186,10 +186,31 @@ export function createApp(bindings = {}) {
                 ? await builder.parseInputItems(chain, { allowProvider: false, applyOverrides: false })
                 : [];
 
+            // A node can only be replaced in place when the input is a plain
+            // line-per-node list. Base64 blobs, YAML and subscription URLs have
+            // no line that maps to one node, so they report null and the UI
+            // hides the edit control.
+            const lineIndexFor = (source, tag) => {
+                if (typeof source !== 'string' || !source) return null;
+                const lines = source.split('\n');
+                for (let i = 0; i < lines.length; i += 1) {
+                    const hash = lines[i].lastIndexOf('#');
+                    if (hash === -1) continue;
+                    let fragment = lines[i].slice(hash + 1).trim();
+                    try {
+                        fragment = decodeURIComponent(fragment);
+                    } catch (_) {
+                        // Keep the raw fragment when it is not valid percent-encoding.
+                    }
+                    if (fragment === tag) return i;
+                }
+                return null;
+            };
+
             // Front/back only means something in chain mode; outside it every
             // node is just a node, so leave role empty and the UI hides the tag.
             const chainMode = typeof chain === 'string' && chain.trim() !== '';
-            const summarize = (items, role) => items
+            const summarize = (items, role, source) => items
                 .filter(item => item?.tag)
                 .map(item => ({
                     tag: item.tag,
@@ -197,13 +218,14 @@ export function createApp(bindings = {}) {
                     server: item.server,
                     port: item.server_port,
                     udp: item.udp === true,
-                    role: chainMode ? role : null
+                    role: chainMode ? role : null,
+                    line: lineIndexFor(source, item.tag)
                 }));
 
             return c.json({
                 proxies: [
-                    ...summarize(frontItems, 'front'),
-                    ...summarize(backItems, 'back')
+                    ...summarize(frontItems, 'front', chain),
+                    ...summarize(backItems, 'back', config)
                 ]
             });
         } catch (error) {
