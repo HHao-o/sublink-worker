@@ -32,9 +32,14 @@ describe('POST /parse', () => {
         expect(socks).toMatchObject({
             type: 'socks',
             server: 'disp.example.com',
-            port: 8001,
-            role: 'back'
+            port: 8001
         });
+    });
+
+    it('leaves role empty outside chain mode', async () => {
+        const { json } = await parse({ config: BACK });
+
+        expect(json.proxies.every(p => p.role === null)).toBe(true);
     });
 
     it('never exposes credentials', async () => {

@@ -186,6 +186,9 @@ export function createApp(bindings = {}) {
                 ? await builder.parseInputItems(chain, { allowProvider: false, applyOverrides: false })
                 : [];
 
+            // Front/back only means something in chain mode; outside it every
+            // node is just a node, so leave role empty and the UI hides the tag.
+            const chainMode = typeof chain === 'string' && chain.trim() !== '';
             const summarize = (items, role) => items
                 .filter(item => item?.tag)
                 .map(item => ({
@@ -194,7 +197,7 @@ export function createApp(bindings = {}) {
                     server: item.server,
                     port: item.server_port,
                     udp: item.udp === true,
-                    role
+                    role: chainMode ? role : null
                 }));
 
             return c.json({
