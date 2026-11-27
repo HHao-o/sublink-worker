@@ -21,10 +21,36 @@ export class BaseConfigBuilder {
     }
 
     async build() {
-        const customItems = await this.parseCustomItems();
+        const customItems = await this.applyNodeOverrides(await this.parseCustomItems());
         this.addCustomItems(customItems);
         this.addSelectors();
         return this.formatConfig();
+    }
+
+    /**
+     * Swap nodes by name, keeping the original name so groups and rules that
+     * already reference it stay valid. An override that fails to parse is
+     * ignored rather than dropping the node it was meant to replace.
+     */
+    async applyNodeOverrides(items) {
+        if (!this.nodeOverrides || typeof this.nodeOverrides !== 'object') {
+            return items;
+        }
+        if (Object.keys(this.nodeOverrides).length === 0) {
+            return items;
+        }
+
+        const result = [];
+        for (const item of items) {
+            const replacement = item?.tag ? this.nodeOverrides[item.tag] : undefined;
+            if (!replacement) {
+                result.push(item);
+                continue;
+            }
+            const parsed = await ProxyParser.parse(replacement, this.userAgent);
+            result.push(parsed?.tag ? { ...parsed, tag: item.tag } : item);
+        }
+        return result;
     }
 
     async parseCustomItems() {

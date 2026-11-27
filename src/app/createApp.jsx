@@ -12,6 +12,7 @@ import { SurgeConfigBuilder } from '../builders/SurgeConfigBuilder.js';
 import { createTranslator, resolveLanguage } from '../i18n/index.js';
 import { encodeBase64, tryDecodeSubscriptionLines } from '../utils.js';
 import { ShortLinkService } from '../services/shortLinkService.js';
+import { OverrideService } from '../services/overrideService.js';
 import { ConfigStorageService } from '../services/configStorageService.js';
 import { ServiceError, MissingDependencyError } from '../services/errors.js';
 import { normalizeRuntime } from '../runtime/runtimeConfig.js';
@@ -23,7 +24,8 @@ export function createApp(bindings = {}) {
     const runtime = normalizeRuntime(bindings);
     const services = {
         shortLinks: runtime.kv ? new ShortLinkService(runtime.kv, { shortLinkTtlSeconds: runtime.config.shortLinkTtlSeconds }) : null,
-        configStorage: runtime.kv ? new ConfigStorageService(runtime.kv, { configTtlSeconds: runtime.config.configTtlSeconds }) : null
+        configStorage: runtime.kv ? new ConfigStorageService(runtime.kv, { configTtlSeconds: runtime.config.configTtlSeconds }) : null,
+        overrides: runtime.kv ? new OverrideService(runtime.kv) : null
     };
 
     const app = new Hono();
@@ -76,6 +78,7 @@ export function createApp(bindings = {}) {
             const externalController = c.req.query('external_controller');
             const externalUiDownloadUrl = c.req.query('external_ui_download_url');
             const configId = c.req.query('configId');
+            const overridesId = c.req.query('overridesId');
             const lang = c.get('lang');
 
             const requestedSingboxVersion = c.req.query('singbox_version') || c.req.query('sb_version') || c.req.query('sb_ver');
@@ -105,6 +108,7 @@ export function createApp(bindings = {}) {
                 singboxConfigVersion,
                 includeAutoSelect
             );
+            builder.nodeOverrides = await loadNodeOverrides(services.overrides, overridesId);
             await builder.build();
             const userinfo = builder.getSubscriptionUserinfo();
             if (userinfo) {
@@ -133,6 +137,7 @@ export function createApp(bindings = {}) {
             const externalUiDownloadUrl = c.req.query('external_ui_download_url');
             const configId = c.req.query('configId');
             const chainInput = c.req.query('chain');
+            const overridesId = c.req.query('overridesId');
             const lang = c.get('lang');
 
             let baseConfig;
@@ -155,6 +160,7 @@ export function createApp(bindings = {}) {
                 includeAutoSelect,
                 chainInput
             );
+            builder.nodeOverrides = await loadNodeOverrides(services.overrides, overridesId);
             await builder.build();
             const userinfo = builder.getSubscriptionUserinfo();
             const headers = { 'Content-Type': 'text/yaml; charset=utf-8' };
@@ -181,9 +187,17 @@ export function createApp(bindings = {}) {
             const lang = c.get('lang');
 
             const builder = new ClashConfigBuilder(config, [], [], null, lang, ua);
-            const backItems = await builder.parseInputItems(config, { allowProvider: false });
+            const overrides = body?.overrides && typeof body.overrides === 'object' && !Array.isArray(body.overrides)
+                ? body.overrides
+                : null;
+            builder.nodeOverrides = overrides;
+            const backItems = await builder.applyNodeOverrides(
+                await builder.parseInputItems(config, { allowProvider: false })
+            );
             const frontItems = chain
-                ? await builder.parseInputItems(chain, { allowProvider: false, applyOverrides: false })
+                ? await builder.applyNodeOverrides(
+                    await builder.parseInputItems(chain, { allowProvider: false, applyOverrides: false })
+                )
                 : [];
 
             // A node can only be replaced in place when the input is a plain
@@ -233,6 +247,22 @@ export function createApp(bindings = {}) {
         }
     });
 
+    // Stores the node replacement table so a short link only has to carry its id.
+    app.post('/overrides', async (c) => {
+        try {
+            const body = await c.req.json().catch(() => null);
+            const overrides = body?.overrides;
+            if (!overrides || typeof overrides !== 'object' || Array.isArray(overrides)) {
+                return c.text('Missing overrides', 400);
+            }
+            const service = requireOverrideService(services.overrides);
+            const id = await service.save(overrides);
+            return c.text(id);
+        } catch (error) {
+            return handleError(c, error, runtime.logger);
+        }
+    });
+
     app.get('/surge', async (c) => {
         try {
             const config = c.req.query('config');
@@ -246,6 +276,7 @@ export function createApp(bindings = {}) {
             const groupByCountry = parseBooleanFlag(c.req.query('group_by_country'));
             const includeAutoSelect = c.req.query('include_auto_select') !== 'false';
             const configId = c.req.query('configId');
+            const overridesId = c.req.query('overridesId');
             const lang = c.get('lang');
 
             let baseConfig;
@@ -265,6 +296,7 @@ export function createApp(bindings = {}) {
                 includeAutoSelect
             );
             builder.setSubscriptionUrl(c.req.url);
+            builder.nodeOverrides = await loadNodeOverrides(services.overrides, overridesId);
             await builder.build();
 
             const userinfo = builder.getSubscriptionUserinfo();
@@ -362,12 +394,28 @@ export function createApp(bindings = {}) {
             return c.text('Missing config parameter', 400);
         }
 
+        // Xray output is a raw URI list, so an override is a line swap by name.
+        const nodeOverrides = await loadNodeOverrides(services.overrides, c.req.query('overridesId'));
+        const withOverrides = nodeOverrides
+            ? finalProxyList.map(item => {
+                const hash = item.lastIndexOf('#');
+                if (hash === -1) return item;
+                let tag = item.slice(hash + 1).trim();
+                try {
+                    tag = decodeURIComponent(tag);
+                } catch (_) {
+                    // Keep the raw fragment when it is not valid percent-encoding.
+                }
+                return nodeOverrides[tag] || item;
+            }).join('\n')
+            : finalString;
+
         const responseHeaders = {};
         if (subscriptionUserinfo) {
             responseHeaders['subscription-userinfo'] = subscriptionUserinfo;
         }
 
-        return c.text(encodeBase64(finalString), 200, responseHeaders);
+        return c.text(encodeBase64(withOverrides), 200, responseHeaders);
     });
 
     // POST keeps long subscription URLs out of the request line, which
@@ -636,6 +684,26 @@ function requireConfigStorage(service) {
         throw new MissingDependencyError('Config storage functionality is unavailable');
     }
     return service;
+}
+
+function requireOverrideService(service) {
+    if (!service) {
+        throw new MissingDependencyError('Node override functionality is unavailable');
+    }
+    return service;
+}
+
+// Loading overrides must never break a conversion: a stale or missing id just
+// means the subscription is used as-is.
+async function loadNodeOverrides(service, id) {
+    if (!service || typeof id !== 'string' || id === '') {
+        return null;
+    }
+    try {
+        return await service.get(id);
+    } catch {
+        return null;
+    }
 }
 
 function handleError(c, error, logger) {

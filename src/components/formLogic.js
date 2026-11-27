@@ -114,6 +114,7 @@ export const formLogicFn = (t) => {
             updateDraft: '',
             updateError: '',
             updatingNode: false,
+            overrides: {},
             // These will be populated from window.APP_TRANSLATIONS
             processingText: '',
             convertText: '',
@@ -374,6 +375,7 @@ export const formLogicFn = (t) => {
                     this.input = '';
                     this.chainInput = '';
                     this.parsedNodes = null;
+                    this.overrides = {};
                     this.generatedLinks = null;
                     this.shortenedLinks = null;
                     this.customShortCode = '';
@@ -423,6 +425,25 @@ export const formLogicFn = (t) => {
                         params.append('configId', configId);
                     }
 
+                    // Overrides live in KV so the short link only carries the id.
+                    if (Object.keys(this.overrides).length > 0) {
+                        try {
+                            const overrideRes = await fetch(`${origin}/overrides`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ overrides: this.overrides })
+                            });
+                            if (overrideRes.ok) {
+                                const overrideId = (await overrideRes.text()).trim();
+                                if (overrideId) {
+                                    params.append('overridesId', overrideId);
+                                }
+                            }
+                        } catch (error) {
+                            console.error('Failed to store node overrides:', error);
+                        }
+                    }
+
                     // All four links must share one identical query string: the
                     // short-link flow reuses a single code for every format, so
                     // any parameter present in only one of them would be
@@ -470,7 +491,8 @@ export const formLogicFn = (t) => {
                         body: JSON.stringify({
                             config: source,
                             chain: this.chainMode ? this.input.trim() : undefined,
-                            ua: this.customUA
+                            ua: this.customUA,
+                            overrides: Object.keys(this.overrides).length > 0 ? this.overrides : undefined
                         })
                     });
                     if (!res.ok) {
@@ -529,9 +551,30 @@ export const formLogicFn = (t) => {
                         return;
                     }
 
+                    if (node.line == null || node.line === undefined) {
+                        // Subscription / YAML / Base64 input has no line that
+                        // maps to one node, so remember the replacement by name
+                        // and let the builder apply it after parsing.
+                        this.overrides = { ...this.overrides, [node.tag]: draft };
+                        const index = (this.parsedNodes || []).findIndex(n => n.tag === node.tag && n.role === node.role);
+                        if (index >= 0) {
+                            const next = [...this.parsedNodes];
+                            next[index] = {
+                                ...next[index],
+                                type: parsed[0].type,
+                                server: parsed[0].server,
+                                port: parsed[0].port,
+                                udp: parsed[0].udp
+                            };
+                            this.parsedNodes = next;
+                        }
+                        this.cancelUpdateNode();
+                        return;
+                    }
+
                     const source = node.role === 'front' ? this.input : (this.chainMode ? this.chainInput : this.input);
                     const lines = source.split('\n');
-                    if (node.line == null || node.line >= lines.length) {
+                    if (node.line >= lines.length) {
                         this.updateError = tr.updateNodeNoLine || '无法定位原始行，请手动修改输入源';
                         return;
                     }
@@ -552,6 +595,16 @@ export const formLogicFn = (t) => {
                 } finally {
                     this.updatingNode = false;
                 }
+            },
+
+            async clearOverride(tag) {
+                if (!Object.prototype.hasOwnProperty.call(this.overrides, tag)) {
+                    return;
+                }
+                const next = { ...this.overrides };
+                delete next[tag];
+                this.overrides = next;
+                await this.parseNodes();
             },
 
             async shortenLinks() {

@@ -465,14 +465,24 @@ class="px-6 py-3.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 bo
               <span x-show="node.udp" class="text-[11px] px-1.5 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300">UDP</span>
               <span x-show="node.role === 'front'" class="text-[11px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">{t('nodeRoleFront')}</span>
               <span x-show="node.role === 'back'" class="text-[11px] px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300">{t('nodeRoleBack')}</span>
-              <button
-                type="button"
-                x-show="node.line !== null && node.line !== undefined"
-                x-on:click="startUpdateNode(node)"
-                class="ml-auto text-[11px] px-2 py-0.5 rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-primary-50 dark:hover:bg-primary-900/20 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
-              >
-                <i class="fas fa-rotate mr-1"></i>{t('updateNode')}
-              </button>
+              <span x-show="overrides[node.tag]" class="text-[11px] px-1.5 py-0.5 rounded bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300">{t('nodeOverridden')}</span>
+              <div class="ml-auto flex gap-1">
+                <button
+                  type="button"
+                  x-on:click="startUpdateNode(node)"
+                  class="text-[11px] px-2 py-0.5 rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-primary-50 dark:hover:bg-primary-900/20 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+                >
+                  <i class="fas fa-rotate mr-1"></i>{t('updateNode')}
+                </button>
+                <button
+                  type="button"
+                  x-show="overrides[node.tag]"
+                  x-on:click="clearOverride(node.tag)"
+                  class="text-[11px] px-2 py-0.5 rounded border border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                >
+                  {t('clearOverride')}
+                </button>
+              </div>
             </div>
 
             <div x-show="updatingNodeTag === node.tag" x-cloak class="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 space-y-2">

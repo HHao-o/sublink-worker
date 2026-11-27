@@ -69,9 +69,13 @@ export class ClashConfigBuilder extends BaseConfigBuilder {
     async build() {
         // Chain mode cannot use proxy-providers: the back proxies need a
         // concrete dialer-proxy target that lives in this same config.
-        const backItems = await this.parseInputItems(this.inputString, { allowProvider: !this.chainInput });
+        const backItems = await this.applyNodeOverrides(
+            await this.parseInputItems(this.inputString, { allowProvider: !this.chainInput })
+        );
         const frontItems = this.chainInput
-            ? await this.parseInputItems(this.chainInput, { allowProvider: false, applyOverrides: false })
+            ? await this.applyNodeOverrides(
+                await this.parseInputItems(this.chainInput, { allowProvider: false, applyOverrides: false })
+            )
             : [];
 
         this.addCustomItems(backItems);
