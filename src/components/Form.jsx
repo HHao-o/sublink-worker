@@ -34,7 +34,9 @@ export const Form = (props) => {
     customShortCode: t('customShortCode'),
     optional: t('optional'),
     customShortCodePlaceholder: t('customShortCodePlaceholder'),
-    showFullLinks: t('showFullLinks')
+    showFullLinks: t('showFullLinks'),
+    parseNodes: t('parseNodes'),
+    parsingNodes: t('parsingNodes')
   };
 
   const scriptContent = `
@@ -399,7 +401,18 @@ export const Form = (props) => {
         </div>
 
   {/* Action Buttons */ }
-  <div class="flex flex-col sm:flex-row gap-4">
+  <div class="flex flex-col gap-4">
+          <button
+            type="button"
+            x-on:click="parseNodes()"
+            x-bind:disabled="parsingNodes"
+            class="w-full py-3 px-6 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 rounded-xl font-semibold hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 flex items-center justify-center gap-2 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            <i class="fas" x-bind:class="parsingNodes ? 'fa-spinner fa-spin' : 'fa-list-ul'"></i>
+            <span x-text="parsingNodes ? parsingNodesText : parseNodesText">{t('parseNodes')}</span>
+          </button>
+
+          <div class="flex flex-col sm:flex-row gap-4">
           <button 
             type="submit" 
             class="flex-1 py-3.5 px-6 bg-gradient-to-r from-primary-600 to-primary-500 hover:from-primary-700 hover:to-primary-600 text-white rounded-xl font-bold shadow-lg shadow-primary-500/30 hover:shadow-primary-500/40 transform hover:-translate-y-0.5 transition-all duration-200 flex items-center justify-center gap-2"
@@ -418,8 +431,46 @@ class="px-6 py-3.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 bo
 { t('clear') }
           </button>
         </div>
+        </div>
       </div>
       </form>
+
+  {/* Parsed Nodes */}
+  <div x-cloak x-show="parsedNodes" {...{'x-transition:enter': 'transition ease-out duration-300', 'x-transition:enter-start': 'opacity-0 transform translate-y-4', 'x-transition:enter-end': 'opacity-100 transform translate-y-0'}} class="mt-8">
+    <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+      <div class="flex items-center justify-between gap-3 mb-4">
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+          <span class="w-8 h-8 rounded-lg bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 flex items-center justify-center">
+            <i class="fas fa-list-ul text-sm"></i>
+          </span>
+          {t('parsedNodesTitle')}
+          <span class="text-sm font-normal text-gray-500 dark:text-gray-400" x-text="`(${parsedNodes?.length || 0})`"></span>
+        </h2>
+        <button type="button" x-on:click="parsedNodes = null" class="p-2 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" aria-label="close">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+
+      <p x-show="parsedNodes && parsedNodes.length === 0" class="text-sm text-gray-500 dark:text-gray-400">{t('noNodesParsed')}</p>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <template x-for="(node, index) in (parsedNodes || [])" x-bind:key="`${node.role}-${node.tag}-${index}`">
+          <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-3">
+            <div class="flex items-center justify-between gap-2">
+              <span class="truncate text-sm font-medium text-gray-900 dark:text-white" x-text="node.tag"></span>
+              <span class="shrink-0 text-[11px] px-2 py-0.5 rounded-md bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400" x-text="node.type"></span>
+            </div>
+            <div class="mt-1 truncate font-mono text-xs text-gray-500 dark:text-gray-400" x-text="`${node.server}:${node.port}`"></div>
+            <div class="mt-2 flex flex-wrap gap-1">
+              <span x-show="node.udp" class="text-[11px] px-1.5 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300">UDP</span>
+              <span x-show="node.role === 'front'" class="text-[11px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">{t('nodeRoleFront')}</span>
+              <span x-show="node.role === 'back'" class="text-[11px] px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300">{t('nodeRoleBack')}</span>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+  </div>
 
   {/* Results Section */ }
   <div x-cloak x-show="generatedLinks" x-data="{ copied: null }" {...{'x-transition:enter': 'transition ease-out duration-500', 'x-transition:enter-start': 'opacity-0 transform translate-y-8', 'x-transition:enter-end': 'opacity-100 transform translate-y-0'}} class="mt-12">

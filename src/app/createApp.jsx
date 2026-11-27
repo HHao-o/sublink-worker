@@ -167,6 +167,47 @@ export function createApp(bindings = {}) {
         }
     });
 
+    // Read-only preview of what the input parses into. Credentials (password,
+    // uuid) are deliberately left out: the browser only needs to show a list.
+    app.post('/parse', async (c) => {
+        try {
+            const body = await c.req.json().catch(() => null);
+            const config = body?.config;
+            if (!config) {
+                return c.text('Missing config parameter', 400);
+            }
+            const chain = body?.chain;
+            const ua = body?.ua || getRequestHeader(c.req, 'User-Agent') || DEFAULT_USER_AGENT;
+            const lang = c.get('lang');
+
+            const builder = new ClashConfigBuilder(config, [], [], null, lang, ua);
+            const backItems = await builder.parseInputItems(config, { allowProvider: false });
+            const frontItems = chain
+                ? await builder.parseInputItems(chain, { allowProvider: false, applyOverrides: false })
+                : [];
+
+            const summarize = (items, role) => items
+                .filter(item => item?.tag)
+                .map(item => ({
+                    tag: item.tag,
+                    type: item.type,
+                    server: item.server,
+                    port: item.server_port,
+                    udp: item.udp === true,
+                    role
+                }));
+
+            return c.json({
+                proxies: [
+                    ...summarize(frontItems, 'front'),
+                    ...summarize(backItems, 'back')
+                ]
+            });
+        } catch (error) {
+            return handleError(c, error, runtime.logger);
+        }
+    });
+
     app.get('/surge', async (c) => {
         try {
             const config = c.req.query('config');

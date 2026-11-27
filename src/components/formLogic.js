@@ -108,12 +108,16 @@ export const formLogicFn = (t) => {
             customShortCode: '',
             parsingUrl: false,
             parseDebounceTimer: null,
+            parsingNodes: false,
+            parsedNodes: null,
             // These will be populated from window.APP_TRANSLATIONS
             processingText: '',
             convertText: '',
             shortenLinksText: '',
             shorteningText: '',
             showFullLinksText: '',
+            parseNodesText: '',
+            parsingNodesText: '',
 
             init() {
                 // Load translations
@@ -123,6 +127,8 @@ export const formLogicFn = (t) => {
                     this.shortenLinksText = window.APP_TRANSLATIONS.shortenLinks;
                     this.shorteningText = window.APP_TRANSLATIONS.shortening;
                     this.showFullLinksText = window.APP_TRANSLATIONS.showFullLinks;
+                    this.parseNodesText = window.APP_TRANSLATIONS.parseNodes;
+                    this.parsingNodesText = window.APP_TRANSLATIONS.parsingNodes;
                     this.saveConfigText = window.APP_TRANSLATIONS.saveConfig;
                     this.savingConfigText = window.APP_TRANSLATIONS.savingConfig;
                     this.configContentRequiredText = window.APP_TRANSLATIONS.configContentRequired;
@@ -363,6 +369,7 @@ export const formLogicFn = (t) => {
                 if (confirm(window.APP_TRANSLATIONS.confirmClearAll)) {
                     this.input = '';
                     this.chainInput = '';
+                    this.parsedNodes = null;
                     this.generatedLinks = null;
                     this.shortenedLinks = null;
                     this.customShortCode = '';
@@ -441,6 +448,37 @@ export const formLogicFn = (t) => {
                     alert(window.APP_TRANSLATIONS.errorGeneratingLinks);
                 } finally {
                     this.loading = false;
+                }
+            },
+
+            async parseNodes() {
+                const source = (this.chainMode ? this.chainInput : this.input).trim();
+                if (!source) {
+                    alert(window.APP_TRANSLATIONS.noInputForParse || '请先输入节点');
+                    return;
+                }
+
+                this.parsingNodes = true;
+                try {
+                    const res = await fetch('/parse', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            config: source,
+                            chain: this.chainMode ? this.input.trim() : undefined,
+                            ua: this.customUA
+                        })
+                    });
+                    if (!res.ok) {
+                        throw new Error(await res.text());
+                    }
+                    const data = await res.json();
+                    this.parsedNodes = Array.isArray(data?.proxies) ? data.proxies : [];
+                } catch (error) {
+                    console.error('Failed to parse nodes:', error);
+                    alert(window.APP_TRANSLATIONS.parseNodesFailed || '解析失败');
+                } finally {
+                    this.parsingNodes = false;
                 }
             },
 
