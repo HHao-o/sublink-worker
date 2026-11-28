@@ -21,10 +21,24 @@ export class BaseConfigBuilder {
     }
 
     async build() {
-        const customItems = await this.applyNodeOverrides(await this.parseCustomItems());
+        let customItems = await this.applyNodeOverrides(await this.parseCustomItems());
+        customItems = await this.withExtraItems(customItems);
         this.addCustomItems(customItems);
         this.addSelectors();
         return this.formatConfig();
+    }
+
+    /**
+     * Append nodes pasted into the "add node" box. They are parsed as their own
+     * input so the original config keeps whatever format it had; splicing them
+     * into a YAML or Base64 source would corrupt it.
+     */
+    async withExtraItems(items) {
+        if (typeof this.extraInput !== 'string' || this.extraInput.trim() === '') {
+            return items;
+        }
+        const extraItems = await this.parseInputItems(this.extraInput, { allowProvider: false, applyOverrides: false });
+        return [...items, ...extraItems];
     }
 
     /**

@@ -40,7 +40,7 @@ describe('formLogic toString fix', () => {
     // format-specific parameter would be overwritten by the last write.
     expect(src).toContain("params.set('chain', this.input)");
 
-    const uses = src.match(/(?:xray|singbox|clash|surge): origin \+ '\/\w+\?' \+ queryString/g) || [];
+    const uses = src.match(/(?:xray|singbox|clash|surge): origin \+ '\/\w+\?' \+ finalQueryString/g) || [];
     expect(uses).toHaveLength(4);
   });
 

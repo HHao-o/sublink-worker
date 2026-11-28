@@ -117,6 +117,13 @@ export const formLogicFn = (t) => {
             overrides: {},
             overridesBaseId: '',
             overridesDirty: false,
+            extraNodes: [],
+            addNodeOpen: false,
+            addNodeDraft: '',
+            addNodeError: '',
+            addingNode: false,
+            currentShortCode: '',
+            continuing: false,
             // These will be populated from window.APP_TRANSLATIONS
             processingText: '',
             convertText: '',
@@ -380,6 +387,8 @@ export const formLogicFn = (t) => {
                     this.overrides = {};
                     this.overridesBaseId = '';
                     this.overridesDirty = false;
+                    this.extraNodes = [];
+                    this.currentShortCode = '';
                     this.generatedLinks = null;
                     this.shortenedLinks = null;
                     this.customShortCode = '';
@@ -431,6 +440,17 @@ export const formLogicFn = (t) => {
             },
 
             async loadShortLinkState(text) {
+                const value = typeof text === 'string' ? text.trim() : '';
+                let code = '';
+                try {
+                    const parsed = new URL(value);
+                    const match = parsed.pathname.match(/^\/([bcxs])\/([a-zA-Z0-9_-]+)$/);
+                    if (match) code = match[2];
+                } catch {
+                    // Not a URL: leave the current short code untouched.
+                }
+                this.currentShortCode = code;
+
                 const resolved = await this.resolveShortLinkUrl(text);
                 if (!resolved) return null;
                 const overridesId = resolved.searchParams.get('overridesId');
@@ -443,6 +463,95 @@ export const formLogicFn = (t) => {
                     }
                 }
                 return resolved;
+            },
+
+            startAddNode() {
+                this.addNodeOpen = true;
+                this.addNodeDraft = '';
+                this.addNodeError = '';
+            },
+
+            cancelAddNode() {
+                this.addNodeOpen = false;
+                this.addNodeDraft = '';
+                this.addNodeError = '';
+            },
+
+            async confirmAddNode() {
+                const draft = this.addNodeDraft.trim();
+                const tr = window.APP_TRANSLATIONS || {};
+                if (!draft) {
+                    this.addNodeError = tr.addNodeEmpty || '请输入节点链接';
+                    return;
+                }
+
+                this.addingNode = true;
+                this.addNodeError = '';
+                try {
+                    const res = await fetch('/parse', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ config: draft })
+                    });
+                    if (!res.ok) {
+                        throw new Error(await res.text());
+                    }
+                    const data = await res.json();
+                    const parsed = Array.isArray(data?.proxies) ? data.proxies : [];
+                    if (parsed.length === 0) {
+                        this.addNodeError = tr.addNodeInvalid || '未解析到有效节点';
+                        return;
+                    }
+                    this.extraNodes = [...this.extraNodes, draft];
+                    this.cancelAddNode();
+                    await this.parseNodes();
+                } catch (error) {
+                    console.error('Failed to add node:', error);
+                    this.addNodeError = tr.addNodeInvalid || '未解析到有效节点';
+                } finally {
+                    this.addingNode = false;
+                }
+            },
+
+            async continueWithCurrentLink() {
+                const tr = window.APP_TRANSLATIONS || {};
+                if (!this.currentShortCode || this.extraNodes.length === 0) {
+                    return;
+                }
+                if (!confirm(tr.continueConfirm || '原节点列表将被替换，无法撤销，继续？')) {
+                    return;
+                }
+
+                this.continuing = true;
+                try {
+                    const resolved = await this.resolveShortLinkUrl(this.input.trim());
+                    if (!resolved) {
+                        throw new Error('Current input is not a short link');
+                    }
+                    const params = new URLSearchParams(resolved.search);
+                    params.set('extra', this.extraNodes.join('\n'));
+
+                    const res = await fetch('/shorten-v2', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            url: `${window.location.origin}/clash?${params.toString()}`,
+                            shortCode: this.currentShortCode
+                        })
+                    });
+                    if (!res.ok) {
+                        throw new Error(await res.text());
+                    }
+
+                    this.extraNodes = [];
+                    await this.parseNodes();
+                    alert(tr.continueSuccess || '已更新当前链接');
+                } catch (error) {
+                    console.error('Failed to update the current short link:', error);
+                    alert(tr.continueFailed || '更新失败');
+                } finally {
+                    this.continuing = false;
+                }
             },
 
             async submitForm() {
@@ -511,13 +620,19 @@ export const formLogicFn = (t) => {
                         params.set('overridesId', importedOverridesId);
                     }
 
-                    const queryString = params.toString();
-                    this.generatedLinks = {
-                        xray: origin + '/xray?' + queryString,
-                        singbox: origin + '/singbox?' + queryString,
-                        clash: origin + '/clash?' + queryString,
-                        surge: origin + '/surge?' + queryString
+                    if (this.extraNodes.length > 0) {
+                        params.set('extra', this.extraNodes.join('\n'));
+                    }
+                    const finalQueryString = params.toString();                    this.generatedLinks = {
+                        xray: origin + '/xray?' + finalQueryString,
+                        singbox: origin + '/singbox?' + finalQueryString,
+                        clash: origin + '/clash?' + finalQueryString,
+                        surge: origin + '/surge?' + finalQueryString
                     };
+
+                    // Hand back short links directly; a KV outage falls back to
+                    // the long links already shown in the result panel.
+                    await this.shortenLinks(true);
 
                     // Scroll to results
                     setTimeout(() => {
@@ -559,6 +674,7 @@ export const formLogicFn = (t) => {
                             config: parseSource,
                             chain: parseChain,
                             ua: this.customUA,
+                            extra: this.extraNodes.length > 0 ? this.extraNodes.join('\n') : undefined,
                             overrides: Object.keys(resolvedOverrides || {}).length > 0
                                 ? resolvedOverrides
                                 : undefined
@@ -678,10 +794,10 @@ export const formLogicFn = (t) => {
                 await this.parseNodes();
             },
 
-            async shortenLinks() {
+            async shortenLinks(silent = false) {
                 // Check if links are already shortened
                 if (this.shortenedLinks) {
-                    alert(window.APP_TRANSLATIONS.alreadyShortened);
+                    if (!silent) alert(window.APP_TRANSLATIONS.alreadyShortened);
                     return;
                 }
 
@@ -737,7 +853,7 @@ export const formLogicFn = (t) => {
                     this.shortenedLinks = shortened;
                 } catch (error) {
                     console.error('Error shortening links:', error);
-                    alert(window.APP_TRANSLATIONS.shortenFailed);
+                    if (!silent) alert(window.APP_TRANSLATIONS.shortenFailed);
                 } finally {
                     this.shortening = false;
                 }

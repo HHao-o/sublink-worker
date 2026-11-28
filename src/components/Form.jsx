@@ -431,6 +431,18 @@ class="px-6 py-3.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 bo
 { t('clear') }
           </button>
         </div>
+
+          <button
+            type="button"
+            x-show="currentShortCode && extraNodes.length > 0"
+            x-cloak
+            x-on:click="continueWithCurrentLink()"
+            x-bind:disabled="continuing"
+            class="w-full py-3 px-6 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 rounded-xl font-semibold hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            <i class="fas" x-bind:class="continuing ? 'fa-spinner fa-spin' : 'fa-link'"></i>
+            <span>{t('continueWithCurrentLink')}</span>
+          </button>
         </div>
       </div>
       </form>
@@ -446,9 +458,46 @@ class="px-6 py-3.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 bo
           {t('parsedNodesTitle')}
           <span class="text-sm font-normal text-gray-500 dark:text-gray-400" x-text="`(${parsedNodes?.length || 0})`"></span>
         </h2>
-        <button type="button" x-on:click="parsedNodes = null" class="p-2 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" aria-label="close">
-          <i class="fas fa-times"></i>
-        </button>
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            x-on:click="startAddNode()"
+            class="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-primary-50 dark:hover:bg-primary-900/20 hover:text-primary-600 dark:hover:text-primary-400 transition-colors flex items-center gap-1"
+          >
+            <i class="fas fa-plus"></i>{t('addNode')}
+          </button>
+          <button type="button" x-on:click="parsedNodes = null" class="p-2 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" aria-label="close">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+      </div>
+
+      <div x-show="addNodeOpen" x-cloak class="mb-4 p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 space-y-2">
+        <textarea
+          x-model="addNodeDraft"
+          rows={3}
+          placeholder={t('addNodePlaceholder')}
+          class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-mono text-xs resize-y focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+        ></textarea>
+        <p x-show="addNodeError" x-text="addNodeError" class="text-xs text-red-500"></p>
+        <div class="flex gap-2">
+          <button
+            type="button"
+            x-on:click="confirmAddNode()"
+            x-bind:disabled="addingNode"
+            class="px-3 py-1.5 rounded-lg bg-primary-600 hover:bg-primary-700 text-white text-xs font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            <i class="fas" x-bind:class="addingNode ? 'fa-spinner fa-spin' : 'fa-check'"></i>
+            {t('addNodeConfirm')}
+          </button>
+          <button
+            type="button"
+            x-on:click="cancelAddNode()"
+            class="px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+          >
+            {t('addNodeCancel')}
+          </button>
+        </div>
       </div>
 
       <p x-show="parsedNodes && parsedNodes.length === 0" class="text-sm text-gray-500 dark:text-gray-400">{t('noNodesParsed')}</p>
@@ -466,6 +515,7 @@ class="px-6 py-3.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 bo
               <span x-show="node.role === 'front'" class="text-[11px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">{t('nodeRoleFront')}</span>
               <span x-show="node.role === 'back'" class="text-[11px] px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300">{t('nodeRoleBack')}</span>
               <span x-show="overrides[node.tag]" class="text-[11px] px-1.5 py-0.5 rounded bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300">{t('nodeOverridden')}</span>
+              <span x-show="node.extra" class="text-[11px] px-1.5 py-0.5 rounded bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300">{t('nodeAdded')}</span>
               <div class="ml-auto flex gap-1">
                 <button
                   type="button"

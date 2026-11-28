@@ -79,6 +79,7 @@ export function createApp(bindings = {}) {
             const externalUiDownloadUrl = c.req.query('external_ui_download_url');
             const configId = c.req.query('configId');
             const overridesId = c.req.query('overridesId');
+            const extraInput = c.req.query('extra');
             const lang = c.get('lang');
 
             const requestedSingboxVersion = c.req.query('singbox_version') || c.req.query('sb_version') || c.req.query('sb_ver');
@@ -109,6 +110,7 @@ export function createApp(bindings = {}) {
                 includeAutoSelect
             );
             builder.nodeOverrides = await loadNodeOverrides(services.overrides, overridesId);
+            builder.extraInput = extraInput;
             await builder.build();
             const userinfo = builder.getSubscriptionUserinfo();
             if (userinfo) {
@@ -138,6 +140,7 @@ export function createApp(bindings = {}) {
             const configId = c.req.query('configId');
             const chainInput = c.req.query('chain');
             const overridesId = c.req.query('overridesId');
+            const extraInput = c.req.query('extra');
             const lang = c.get('lang');
 
             let baseConfig;
@@ -161,6 +164,7 @@ export function createApp(bindings = {}) {
                 chainInput
             );
             builder.nodeOverrides = await loadNodeOverrides(services.overrides, overridesId);
+            builder.extraInput = extraInput;
             await builder.build();
             const userinfo = builder.getSubscriptionUserinfo();
             const headers = { 'Content-Type': 'text/yaml; charset=utf-8' };
@@ -191,9 +195,15 @@ export function createApp(bindings = {}) {
                 ? body.overrides
                 : null;
             builder.nodeOverrides = overrides;
-            const backItems = await builder.applyNodeOverrides(
+            builder.extraInput = typeof body?.extra === 'string' ? body.extra : null;
+            const baseItems = await builder.applyNodeOverrides(
                 await builder.parseInputItems(config, { allowProvider: false })
             );
+            const extraItems = builder.extraInput
+                ? await builder.parseInputItems(builder.extraInput, { allowProvider: false, applyOverrides: false })
+                : [];
+            const backItems = [...baseItems, ...extraItems];
+            const extraTags = new Set(extraItems.map(item => item?.tag).filter(Boolean));
             const frontItems = chain
                 ? await builder.applyNodeOverrides(
                     await builder.parseInputItems(chain, { allowProvider: false, applyOverrides: false })
@@ -233,7 +243,8 @@ export function createApp(bindings = {}) {
                     port: item.server_port,
                     udp: item.udp === true,
                     role: chainMode ? role : null,
-                    line: lineIndexFor(source, item.tag)
+                    line: lineIndexFor(source, item.tag),
+                    extra: role === 'back' && extraTags.has(item.tag)
                 }));
 
             return c.json({
@@ -288,6 +299,7 @@ export function createApp(bindings = {}) {
             const includeAutoSelect = c.req.query('include_auto_select') !== 'false';
             const configId = c.req.query('configId');
             const overridesId = c.req.query('overridesId');
+            const extraInput = c.req.query('extra');
             const lang = c.get('lang');
 
             let baseConfig;
@@ -308,6 +320,7 @@ export function createApp(bindings = {}) {
             );
             builder.setSubscriptionUrl(c.req.url);
             builder.nodeOverrides = await loadNodeOverrides(services.overrides, overridesId);
+            builder.extraInput = extraInput;
             await builder.build();
 
             const userinfo = builder.getSubscriptionUserinfo();
@@ -398,6 +411,14 @@ export function createApp(bindings = {}) {
                 if (!Array.isArray(processed)) processed = [processed];
                 finalProxyList.push(...processed.filter(item => typeof item === 'string' && item.trim() !== ''));
             }
+        }
+
+        // Xray output is a raw URI list; extra nodes are appended as URI lines.
+        const extraInput = c.req.query('extra');
+        if (extraInput && extraInput.trim()) {
+            let extraLines = tryDecodeSubscriptionLines(extraInput);
+            if (!Array.isArray(extraLines)) extraLines = [extraLines];
+            finalProxyList.push(...extraLines.filter(item => typeof item === 'string' && item.trim() !== ''));
         }
 
         const finalString = finalProxyList.join('\n');
