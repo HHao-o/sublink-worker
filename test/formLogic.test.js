@@ -56,4 +56,10 @@ describe('formLogic toString fix', () => {
     expect(src).toContain('new URLSearchParams(resolvedShortLink.search)');
     expect(src).toContain('params.set(\'overridesId\', overrideId)');
   });
+
+  it('merges the short link extra nodes with the locally added ones', () => {
+    const src = formLogicFn.toString();
+    expect(src).toContain("resolved?.searchParams.get('extra')");
+    expect(src).toContain("const mergedExtra = [existingExtra, this.extraNodes.join('\\n')].filter(Boolean).join('\\n')");
+  });
 });

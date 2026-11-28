@@ -529,7 +529,9 @@ export const formLogicFn = (t) => {
                         throw new Error('Current input is not a short link');
                     }
                     const params = new URLSearchParams(resolved.search);
-                    params.set('extra', this.extraNodes.join('\n'));
+                    const existingExtra = params.get('extra') || '';
+                    const mergedExtra = [existingExtra, this.extraNodes.join('\n')].filter(Boolean).join('\n');
+                    params.set('extra', mergedExtra);
 
                     const res = await fetch('/shorten-v2', {
                         method: 'POST',
@@ -621,7 +623,10 @@ export const formLogicFn = (t) => {
                     }
 
                     if (this.extraNodes.length > 0) {
-                        params.set('extra', this.extraNodes.join('\n'));
+                        // Keep whatever the short link already carried.
+                        const existingExtra = params.get('extra') || '';
+                        const mergedExtra = [existingExtra, this.extraNodes.join('\n')].filter(Boolean).join('\n');
+                        params.set('extra', mergedExtra);
                     }
                     const finalQueryString = params.toString();                    this.generatedLinks = {
                         xray: origin + '/xray?' + finalQueryString,
@@ -667,6 +672,11 @@ export const formLogicFn = (t) => {
                     // loadShortLinkState already hydrated this.overrides from the
                     // short link's table, so the current object is authoritative.
                     const resolvedOverrides = this.overrides;
+                    // A short link can carry its own extra nodes; merge them with
+                    // the ones added in this session instead of dropping either.
+                    const linkExtra = resolved?.searchParams.get('extra') || '';
+                    const localExtra = this.extraNodes.join('\n');
+                    const combinedExtra = [linkExtra, localExtra].filter(Boolean).join('\n');
                     const res = await fetch('/parse', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -674,7 +684,7 @@ export const formLogicFn = (t) => {
                             config: parseSource,
                             chain: parseChain,
                             ua: this.customUA,
-                            extra: this.extraNodes.length > 0 ? this.extraNodes.join('\n') : undefined,
+                            extra: combinedExtra || undefined,
                             overrides: Object.keys(resolvedOverrides || {}).length > 0
                                 ? resolvedOverrides
                                 : undefined
