@@ -17,20 +17,28 @@ export class OverrideService {
         return this.kv;
     }
 
-    async save(overrides) {
+    async save(overrides, baseId) {
         if (!overrides || typeof overrides !== 'object' || Array.isArray(overrides)) {
             throw new InvalidPayloadError('Overrides must be a plain object');
         }
-        const entries = Object.entries(overrides)
-            .filter(([tag, uri]) => typeof tag === 'string' && tag.trim() !== '' && typeof uri === 'string' && uri.trim() !== '');
-        if (entries.length === 0) {
+
+        const kv = this.ensureKv();
+        const current = baseId ? await this.get(baseId) || {} : {};
+        for (const [tag, uri] of Object.entries(overrides)) {
+            if (typeof tag !== 'string' || tag.trim() === '') continue;
+            if (uri === null) {
+                delete current[tag];
+            } else if (typeof uri === 'string' && uri.trim() !== '') {
+                current[tag] = uri;
+            }
+        }
+        if (Object.keys(current).length === 0) {
             throw new InvalidPayloadError('Overrides must contain at least one node');
         }
 
-        const kv = this.ensureKv();
         const id = `ov_${generateWebPath(8)}`;
         // No expiry: a short link pointing at this id must keep working.
-        await kv.put(id, JSON.stringify(Object.fromEntries(entries)));
+        await kv.put(id, JSON.stringify(current));
         return id;
     }
 

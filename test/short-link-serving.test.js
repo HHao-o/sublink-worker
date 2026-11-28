@@ -61,4 +61,19 @@ describe('short link serving', () => {
 
         expect(res.status).toBe(404);
     });
+
+    it('resolve returns the original URL without mutating its config', async () => {
+        const app = createApp(runtime());
+        const longUrl = `https://haovo.loc.cc/clash?config=${encodeURIComponent(YAML)}&overridesId=ov_AbCd1234`;
+        const code = await shorten(app, longUrl);
+
+        const res = await app.request(`http://x/resolve?url=${encodeURIComponent(`https://haovo.loc.cc/c/${code}`)}`);
+        const data = await res.json();
+        const resolved = new URL(data.originalUrl);
+
+        expect(res.status).toBe(200);
+        expect(resolved.pathname).toBe('/clash');
+        expect(resolved.searchParams.get('config')).toBe(YAML);
+        expect(resolved.searchParams.get('overridesId')).toBe('ov_AbCd1234');
+    });
 });

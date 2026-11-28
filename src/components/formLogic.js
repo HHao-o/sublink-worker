@@ -115,6 +115,8 @@ export const formLogicFn = (t) => {
             updateError: '',
             updatingNode: false,
             overrides: {},
+            overridesBaseId: '',
+            overridesDirty: false,
             // These will be populated from window.APP_TRANSLATIONS
             processingText: '',
             convertText: '',
@@ -376,6 +378,8 @@ export const formLogicFn = (t) => {
                     this.chainInput = '';
                     this.parsedNodes = null;
                     this.overrides = {};
+                    this.overridesBaseId = '';
+                    this.overridesDirty = false;
                     this.generatedLinks = null;
                     this.shortenedLinks = null;
                     this.customShortCode = '';
@@ -394,6 +398,53 @@ export const formLogicFn = (t) => {
                 window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
             },
 
+            async resolveShortLinkUrl(text) {
+                const value = typeof text === 'string' ? text.trim() : '';
+                if (!value || !this.isSubscriptionUrl(value)) {
+                    return null;
+                }
+                try {
+                    const url = new URL(value);
+                    const shortMatch = url.pathname.match(/^\/([bcxs])\/([a-zA-Z0-9_-]+)$/);
+                    if (!shortMatch) return null;
+                    const response = await fetch(`/resolve?url=${encodeURIComponent(value)}`);
+                    if (!response.ok) throw new Error(await response.text());
+                    const data = await response.json();
+                    return data.originalUrl ? new URL(data.originalUrl) : null;
+                } catch (error) {
+                    console.warn('Failed to resolve short link:', error);
+                    throw error;
+                }
+            },
+
+            async fetchOverrides(id) {
+                if (!id) return {};
+                try {
+                    const response = await fetch(`/overrides/${encodeURIComponent(id)}`);
+                    if (!response.ok) return {};
+                    const data = await response.json();
+                    return data?.overrides && typeof data.overrides === 'object' ? data.overrides : {};
+                } catch (error) {
+                    console.warn('Failed to load node overrides:', error);
+                    return {};
+                }
+            },
+
+            async loadShortLinkState(text) {
+                const resolved = await this.resolveShortLinkUrl(text);
+                if (!resolved) return null;
+                const overridesId = resolved.searchParams.get('overridesId');
+                if (overridesId) {
+                    this.overridesBaseId = overridesId;
+                    // Local edits win: only hydrate from KV when the user has
+                    // not already replaced anything in this session.
+                    if (!this.overridesDirty && Object.keys(this.overrides).length === 0) {
+                        this.overrides = await this.fetchOverrides(overridesId);
+                    }
+                }
+                return resolved;
+            },
+
             async submitForm() {
                 this.loading = true;
                 this.shortenedLinks = null; // Reset shortened links when generating new links
@@ -402,57 +453,65 @@ export const formLogicFn = (t) => {
                     const customRulesInput = document.querySelector('input[name="customRules"]');
                     const customRules = customRulesInput && customRulesInput.value ? JSON.parse(customRulesInput.value) : [];
 
-                    // Construct URLs
                     const origin = window.location.origin;
-                    const params = new URLSearchParams();
+                    const sourceText = (this.chainMode ? this.chainInput : this.input).trim();
+                    const resolvedShortLink = await this.loadShortLinkState(sourceText);
+                    const params = resolvedShortLink
+                        ? new URLSearchParams(resolvedShortLink.search)
+                        : new URLSearchParams();
+                    const importedOverridesId = params.get('overridesId');
+
                     // Chain mode swaps the boxes: `config` carries the back node
-                    // (the one actually converted), `chain` the front node.
-                    params.append('config', this.chainMode ? this.chainInput : this.input);
-                    params.append('ua', this.customUA);
-                    params.append('selectedRules', JSON.stringify(this.selectedRules));
-                    params.append('customRules', JSON.stringify(customRules));
-
-                    if (this.groupByCountry) params.append('group_by_country', 'true');
-                    if (!this.includeAutoSelect) params.append('include_auto_select', 'false');
-                    if (this.enableClashUI) params.append('enable_clash_ui', 'true');
-                    if (this.externalController) params.append('external_controller', this.externalController);
-                    if (this.externalUiDownloadUrl) params.append('external_ui_download_url', this.externalUiDownloadUrl);
-
-                    // Add configId if present in URL
-                    const urlParams = new URLSearchParams(window.location.search);
-                    const configId = this.currentConfigId || urlParams.get('configId');
-                    if (configId) {
-                        params.append('configId', configId);
+                    // and `chain` carries the front node. For a pasted short link,
+                    // retain all of its parameters without replacing the textarea.
+                    if (this.chainMode) {
+                        params.set('config', this.chainInput);
+                        params.set('chain', this.input);
+                    } else if (!resolvedShortLink) {
+                        params.set('config', this.input);
                     }
 
-                    // Overrides live in KV so the short link only carries the id.
-                    if (Object.keys(this.overrides).length > 0) {
+                    if (!resolvedShortLink) {
+                        params.set('ua', this.customUA);
+                        params.set('selectedRules', JSON.stringify(this.selectedRules));
+                        params.set('customRules', JSON.stringify(customRules));
+                        if (this.groupByCountry) params.set('group_by_country', 'true');
+                        if (!this.includeAutoSelect) params.set('include_auto_select', 'false');
+                        if (this.enableClashUI) params.set('enable_clash_ui', 'true');
+                        if (this.externalController) params.set('external_controller', this.externalController);
+                        if (this.externalUiDownloadUrl) params.set('external_ui_download_url', this.externalUiDownloadUrl);
+
+                        const urlParams = new URLSearchParams(window.location.search);
+                        const configId = this.currentConfigId || urlParams.get('configId');
+                        if (configId) params.set('configId', configId);
+                    }
+
+                    // Overrides live in KV so short links carry only an id.
+                    // A short link's existing override table is already loaded
+                    // into this.overrides; write a merged table only after a user
+                    // edits or clears a node, otherwise keep its original id.
+                    if (this.overridesDirty && Object.keys(this.overrides).length > 0) {
                         try {
                             const overrideRes = await fetch(`${origin}/overrides`, {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ overrides: this.overrides })
+                                body: JSON.stringify({
+                                    overrides: this.overrides,
+                                    baseId: this.overridesBaseId || importedOverridesId || undefined
+                                })
                             });
                             if (overrideRes.ok) {
                                 const overrideId = (await overrideRes.text()).trim();
-                                if (overrideId) {
-                                    params.append('overridesId', overrideId);
-                                }
+                                if (overrideId) params.set('overridesId', overrideId);
                             }
                         } catch (error) {
                             console.error('Failed to store node overrides:', error);
                         }
+                    } else if (importedOverridesId) {
+                        params.set('overridesId', importedOverridesId);
                     }
 
-                    // All four links must share one identical query string: the
-                    // short-link flow reuses a single code for every format, so
-                    // any parameter present in only one of them would be
-                    // overwritten by the last write and silently disappear.
-                    if (this.chainMode && this.input.trim()) {
-                        params.append('chain', this.input);
-                    }
                     const queryString = params.toString();
-
                     this.generatedLinks = {
                         xray: origin + '/xray?' + queryString,
                         singbox: origin + '/singbox?' + queryString,
@@ -485,14 +544,24 @@ export const formLogicFn = (t) => {
 
                 this.parsingNodes = true;
                 try {
+                    const resolved = await this.loadShortLinkState(source);
+                    const parseSource = resolved?.searchParams.get('config') || source;
+                    const parseChain = this.chainMode
+                        ? (await this.resolveShortLinkUrl(this.input.trim()))?.searchParams.get('chain') || this.input.trim()
+                        : undefined;
+                    // loadShortLinkState already hydrated this.overrides from the
+                    // short link's table, so the current object is authoritative.
+                    const resolvedOverrides = this.overrides;
                     const res = await fetch('/parse', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            config: source,
-                            chain: this.chainMode ? this.input.trim() : undefined,
+                            config: parseSource,
+                            chain: parseChain,
                             ua: this.customUA,
-                            overrides: Object.keys(this.overrides).length > 0 ? this.overrides : undefined
+                            overrides: Object.keys(resolvedOverrides || {}).length > 0
+                                ? resolvedOverrides
+                                : undefined
                         })
                     });
                     if (!res.ok) {
@@ -556,6 +625,7 @@ export const formLogicFn = (t) => {
                         // maps to one node, so remember the replacement by name
                         // and let the builder apply it after parsing.
                         this.overrides = { ...this.overrides, [node.tag]: draft };
+                        this.overridesDirty = true;
                         const index = (this.parsedNodes || []).findIndex(n => n.tag === node.tag && n.role === node.role);
                         if (index >= 0) {
                             const next = [...this.parsedNodes];
@@ -604,6 +674,7 @@ export const formLogicFn = (t) => {
                 const next = { ...this.overrides };
                 delete next[tag];
                 this.overrides = next;
+                this.overridesDirty = true;
                 await this.parseNodes();
             },
 
@@ -690,6 +761,18 @@ export const formLogicFn = (t) => {
                 }, 500);
             },
 
+            // Short links are intentionally kept in the textarea. They are
+            // resolved only by parseNodes() or submitForm().
+            isShortLink(text) {
+                if (typeof text !== 'string') return false;
+                try {
+                    const url = new URL(text.trim());
+                    return /^\/[bcxs]\/[a-zA-Z0-9_-]+$/.test(url.pathname);
+                } catch {
+                    return false;
+                }
+            },
+
             // Check if input looks like a subscription URL
             isSubscriptionUrl(text) {
                 // Check if it's a single line URL (not multiple lines)
@@ -719,7 +802,7 @@ export const formLogicFn = (t) => {
 
             // Try to parse subscription URL
             async tryParseSubscriptionUrl(text) {
-                if (!this.isSubscriptionUrl(text)) {
+                if (this.isShortLink(text) || !this.isSubscriptionUrl(text)) {
                     return;
                 }
 

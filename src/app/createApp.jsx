@@ -256,8 +256,19 @@ export function createApp(bindings = {}) {
                 return c.text('Missing overrides', 400);
             }
             const service = requireOverrideService(services.overrides);
-            const id = await service.save(overrides);
+            const id = await service.save(overrides, body?.baseId);
             return c.text(id);
+        } catch (error) {
+            return handleError(c, error, runtime.logger);
+        }
+    });
+
+    app.get('/overrides/:id', async (c) => {
+        try {
+            const service = requireOverrideService(services.overrides);
+            const overrides = await service.get(c.req.param('id'));
+            if (!overrides) return c.text('Overrides not found', 404);
+            return c.json({ overrides });
         } catch (error) {
             return handleError(c, error, runtime.logger);
         }

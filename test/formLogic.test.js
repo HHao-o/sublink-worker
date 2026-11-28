@@ -38,9 +38,22 @@ describe('formLogic toString fix', () => {
 
     // The short-link flow reuses one code for all four formats, so any
     // format-specific parameter would be overwritten by the last write.
-    expect(src).toContain("params.append('chain', this.input)");
+    expect(src).toContain("params.set('chain', this.input)");
 
     const uses = src.match(/(?:xray|singbox|clash|surge): origin \+ '\/\w+\?' \+ queryString/g) || [];
     expect(uses).toHaveLength(4);
+  });
+
+  it('does not auto-expand short links from the input watcher', () => {
+    const src = formLogicFn.toString();
+    expect(src).toContain('if (this.isShortLink(text) || !this.isSubscriptionUrl(text))');
+  });
+
+  it('resolves short links for preview and conversion without writing their config into the textarea', () => {
+    const src = formLogicFn.toString();
+    expect(src).toContain('async resolveShortLinkUrl(text)');
+    expect(src).toContain('const parseSource = resolved?.searchParams.get(\'config\') || source');
+    expect(src).toContain('new URLSearchParams(resolvedShortLink.search)');
+    expect(src).toContain('params.set(\'overridesId\', overrideId)');
   });
 });
